@@ -31,7 +31,7 @@ import {
   AlertDialogTrigger,
 } from '@/components/ui/alert-dialog';
 import { toast } from 'sonner';
-import { Loader2, Trash2 } from 'lucide-react';
+import { Loader2, Trash2, KeyRound } from 'lucide-react';
 
 const roles = [
   { name: 'System Admin', value: 'system_admin' },
@@ -61,6 +61,7 @@ interface UserEditDialogProps {
 export const UserEditDialog = ({ user, open, onOpenChange, onSuccess, currentUserId }: UserEditDialogProps) => {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
+  const [isResettingPassword, setIsResettingPassword] = useState(false);
   const [fullName, setFullName] = useState(user.full_name || '');
   const [selectedRole, setSelectedRole] = useState(user.roles[0]?.role || '');
   const [selectedDepartment, setSelectedDepartment] = useState<string>(user.roles[0]?.department_id || '');
@@ -156,6 +157,29 @@ export const UserEditDialog = ({ user, open, onOpenChange, onSuccess, currentUse
     }
   };
 
+  const handleResetPassword = async () => {
+    if (user.id === currentUserId) {
+      toast.error('You cannot reset your own password here. Use the profile settings.');
+      return;
+    }
+
+    setIsResettingPassword(true);
+    try {
+      const { error } = await supabase.functions.invoke('reset-password', {
+        body: { userId: user.id },
+      });
+
+      if (error) throw error;
+
+      toast.success('Password reset to default (12345678). User will be required to change it on next login.');
+      queryClient.invalidateQueries({ queryKey: ['users-with-roles'] });
+    } catch (error: any) {
+      toast.error(error.message || 'Failed to reset password');
+    } finally {
+      setIsResettingPassword(false);
+    }
+  };
+
   const isCurrentUser = user.id === currentUserId;
 
   return (
@@ -215,6 +239,48 @@ export const UserEditDialog = ({ user, open, onOpenChange, onSuccess, currentUse
               </SelectContent>
             </Select>
           </div>
+
+          {/* Password Reset Section */}
+          {!isCurrentUser && (
+            <div className="pt-2 border-t">
+              <div className="flex items-center justify-between">
+                <div>
+                  <Label className="text-sm font-medium">Password Reset</Label>
+                  <p className="text-xs text-muted-foreground">Reset password to default (12345678)</p>
+                </div>
+                <AlertDialog>
+                  <AlertDialogTrigger asChild>
+                    <Button 
+                      type="button" 
+                      variant="outline" 
+                      size="sm"
+                      disabled={isResettingPassword}
+                      className="gap-2"
+                    >
+                      <KeyRound className="h-4 w-4" />
+                      Reset
+                    </Button>
+                  </AlertDialogTrigger>
+                  <AlertDialogContent>
+                    <AlertDialogHeader>
+                      <AlertDialogTitle>Reset Password</AlertDialogTitle>
+                      <AlertDialogDescription>
+                        This will reset {user.full_name || user.email}'s password to the default (12345678). 
+                        The user will be required to change their password on next login.
+                      </AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <AlertDialogFooter>
+                      <AlertDialogCancel>Cancel</AlertDialogCancel>
+                      <AlertDialogAction onClick={handleResetPassword}>
+                        {isResettingPassword ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
+                        Reset Password
+                      </AlertDialogAction>
+                    </AlertDialogFooter>
+                  </AlertDialogContent>
+                </AlertDialog>
+              </div>
+            </div>
+          )}
         </div>
 
         <DialogFooter className="flex justify-between sm:justify-between">

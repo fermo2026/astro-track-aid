@@ -26,6 +26,7 @@ import {
   CheckCircle, 
   Loader2,
   ArrowRight,
+  Lock,
 } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 
@@ -52,6 +53,24 @@ interface WorkflowActionsProps {
   onClose?: () => void;
 }
 
+// Helper to check if a record is locked (AVD approved with CMC decision made)
+export const isRecordLocked = (violation: any): boolean => {
+  return (
+    violation.workflow_status === 'cmc_decided' ||
+    violation.workflow_status === 'closed' ||
+    (violation.cmc_decision && violation.cmc_decision !== 'Pending')
+  );
+};
+
+// Helper to check if department users can edit/take action
+export const canDepartmentEdit = (violation: any, isSystemAdmin: boolean, isAVD: boolean): boolean => {
+  // System admins and AVDs can always edit
+  if (isSystemAdmin || isAVD) return true;
+  
+  // Once CMC decision is made, departments cannot edit
+  return !isRecordLocked(violation);
+};
+
 export const WorkflowActions = ({ violation, onClose }: WorkflowActionsProps) => {
   const { user, roles, isSystemAdmin } = useAuth();
   const queryClient = useQueryClient();
@@ -64,10 +83,15 @@ export const WorkflowActions = ({ violation, onClose }: WorkflowActionsProps) =>
   const isDeputy = roles.some(r => r.role === 'deputy_department_head');
   const isHead = roles.some(r => r.role === 'department_head');
   const isAVD = roles.some(r => r.role === 'academic_vice_dean');
+  
+  // Check if record is locked for department users
+  const recordLocked = isRecordLocked(violation);
+  const departmentCanEdit = canDepartmentEdit(violation, isSystemAdmin, isAVD);
 
-  const canSubmitToHead = (isDeputy || isHead) && violation.workflow_status === 'draft';
-  const canApproveAsHead = isHead && violation.workflow_status === 'submitted_to_head';
-  const canSubmitToAVD = isHead && violation.workflow_status === 'approved_by_head';
+  // Department users can only take actions if the record is not locked
+  const canSubmitToHead = departmentCanEdit && (isDeputy || isHead) && violation.workflow_status === 'draft';
+  const canApproveAsHead = departmentCanEdit && isHead && violation.workflow_status === 'submitted_to_head';
+  const canSubmitToAVD = departmentCanEdit && isHead && violation.workflow_status === 'approved_by_head';
   const canApproveAsAVD = isAVD && violation.workflow_status === 'submitted_to_avd';
   const canSetCMCDecision = (isAVD || isSystemAdmin) && 
     (violation.workflow_status === 'approved_by_avd' || violation.workflow_status === 'pending_cmc');
@@ -149,9 +173,19 @@ export const WorkflowActions = ({ violation, onClose }: WorkflowActionsProps) =>
     setShowDecisionDialog(true);
   };
 
+  // Show locked message for department users
+  const showLockedMessage = recordLocked && !isSystemAdmin && !isAVD && (isDeputy || isHead);
+
   return (
     <>
-      <div className="flex flex-wrap gap-2">
+      <div className="flex flex-wrap gap-2 items-center">
+        {showLockedMessage && (
+          <Badge variant="secondary" className="text-xs bg-muted">
+            <Lock className="h-3 w-3 mr-1" />
+            Record locked after CMC decision
+          </Badge>
+        )}
+        
         {canSubmitToHead && (
           <Button
             size="sm"
