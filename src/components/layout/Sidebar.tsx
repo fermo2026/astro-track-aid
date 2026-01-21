@@ -3,7 +3,6 @@ import { NavLink, useLocation } from 'react-router-dom';
 import {
   LayoutDashboard,
   FileText,
-  PlusCircle,
   Users,
   Settings,
   ChevronLeft,
@@ -17,7 +16,6 @@ import { Button } from '@/components/ui/button';
 const navItems = [
   { icon: LayoutDashboard, label: 'Dashboard', path: '/' },
   { icon: FileText, label: 'Violations', path: '/violations' },
-  { icon: PlusCircle, label: 'New Record', path: '/new-violation' },
   { icon: Users, label: 'Students', path: '/students' },
   { icon: Building2, label: 'Organization', path: '/departments' },
   { icon: Shield, label: 'Users & Roles', path: '/users' },
