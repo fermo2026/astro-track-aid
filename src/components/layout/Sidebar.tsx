@@ -19,7 +19,7 @@ const navItems = [
   { icon: FileText, label: 'Violations', path: '/violations' },
   { icon: PlusCircle, label: 'New Record', path: '/new-violation' },
   { icon: Users, label: 'Students', path: '/students' },
-  { icon: Building2, label: 'Departments', path: '/departments' },
+  { icon: Building2, label: 'Organization', path: '/departments' },
   { icon: Shield, label: 'Users & Roles', path: '/users' },
   { icon: Settings, label: 'Settings', path: '/settings' },
 ];
