@@ -1,8 +1,10 @@
 import { useState } from 'react';
-import { Download, Search } from 'lucide-react';
+import { Search, ChevronDown, ChevronUp } from 'lucide-react';
 import { useQuery } from '@tanstack/react-query';
 import { MainLayout } from '@/components/layout/MainLayout';
 import { ViolationDialog } from '@/components/violations/ViolationDialog';
+import { ViolationHistoryDialog } from '@/components/violations/ViolationHistoryDialog';
+import { WorkflowActions } from '@/components/violations/WorkflowActions';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent } from '@/components/ui/card';
@@ -22,9 +24,14 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
+import {
+  Collapsible,
+  CollapsibleContent,
+  CollapsibleTrigger,
+} from '@/components/ui/collapsible';
 import { supabase } from '@/integrations/supabase/client';
 import { ExportButton } from '@/components/export/ExportButton';
-import { Loader2, FileText } from 'lucide-react';
+import { Loader2, FileText, AlertTriangle } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useAuth } from '@/contexts/AuthContext';
 
@@ -32,16 +39,48 @@ const getStatusColor = (status: string) => {
   switch (status) {
     case 'Pending':
       return 'bg-warning/10 text-warning border-warning/20';
-    case 'Warning Issued':
-      return 'bg-info/10 text-info border-info/20';
-    case 'Grade Penalty':
-    case 'Course Failure':
+    case 'One Grade Down':
+      return 'bg-orange-500/10 text-orange-600 border-orange-500/20';
+    case 'F Grade for Course':
+    case 'F Grade with Disciplinary Action':
       return 'bg-destructive/10 text-destructive border-destructive/20';
     case 'Cleared':
       return 'bg-success/10 text-success border-success/20';
-    case 'Suspension':
-    case 'Expulsion':
+    case 'Referred to Discipline Committee':
       return 'bg-destructive/20 text-destructive border-destructive/30';
+    default:
+      return 'bg-muted text-muted-foreground';
+  }
+};
+
+const getWorkflowLabel = (status: string) => {
+  const labels: Record<string, string> = {
+    draft: 'Draft',
+    submitted_to_head: 'Pending Head',
+    approved_by_head: 'Head Approved',
+    submitted_to_avd: 'Pending AVD',
+    approved_by_avd: 'AVD Approved',
+    pending_cmc: 'Pending CMC',
+    cmc_decided: 'CMC Decided',
+    closed: 'Closed',
+  };
+  return labels[status] || status;
+};
+
+const getWorkflowColor = (status: string) => {
+  switch (status) {
+    case 'draft':
+      return 'bg-muted text-muted-foreground';
+    case 'submitted_to_head':
+    case 'submitted_to_avd':
+    case 'pending_cmc':
+      return 'bg-warning/10 text-warning border-warning/20';
+    case 'approved_by_head':
+    case 'approved_by_avd':
+      return 'bg-info/10 text-info border-info/20';
+    case 'cmc_decided':
+    case 'closed':
+      return 'bg-success/10 text-success border-success/20';
     default:
       return 'bg-muted text-muted-foreground';
   }
@@ -51,11 +90,13 @@ const Violations = () => {
   const [searchQuery, setSearchQuery] = useState('');
   const [departmentFilter, setDepartmentFilter] = useState('all');
   const [statusFilter, setStatusFilter] = useState('all');
+  const [expandedRow, setExpandedRow] = useState<string | null>(null);
   const { isSystemAdmin, roles } = useAuth();
   
   const isHead = roles.some(r => r.role === 'department_head' || r.role === 'deputy_department_head');
   const isAVD = roles.some(r => r.role === 'academic_vice_dean');
   const canAddViolation = isSystemAdmin || isHead || isAVD;
+  const canSeeCMC = isSystemAdmin || isAVD;
 
   const { data: departments } = useQuery({
     queryKey: ['departments'],
@@ -84,6 +125,9 @@ const Violations = () => {
           invigilator,
           dac_decision,
           cmc_decision,
+          workflow_status,
+          is_repeat_offender,
+          description,
           created_at,
           students(id, student_id, full_name, program, department_id, departments(id, name, code))
         `)
@@ -185,50 +229,131 @@ const Violations = () => {
                 <Table>
                   <TableHeader>
                     <TableRow>
+                      <TableHead className="w-10"></TableHead>
                       <TableHead>Student</TableHead>
                       <TableHead>Department</TableHead>
                       <TableHead>Course</TableHead>
-                      <TableHead>Violation Type</TableHead>
-                      <TableHead>Date</TableHead>
+                      <TableHead>Violation</TableHead>
+                      <TableHead>Workflow</TableHead>
                       <TableHead>DAC</TableHead>
-                      <TableHead>CMC</TableHead>
+                      {canSeeCMC && <TableHead>CMC</TableHead>}
                     </TableRow>
                   </TableHeader>
                   <TableBody>
                     {filteredViolations.map((v: any) => (
-                      <TableRow key={v.id}>
-                        <TableCell>
-                          <div>
-                            <p className="font-medium">{v.students?.full_name}</p>
-                            <p className="text-sm text-muted-foreground">{v.students?.student_id}</p>
-                          </div>
-                        </TableCell>
-                        <TableCell>
-                          <Badge variant="outline">{v.students?.departments?.code || '—'}</Badge>
-                        </TableCell>
-                        <TableCell>
-                          <div>
-                            <p className="font-medium">{v.course_name}</p>
-                            <p className="text-sm text-muted-foreground">{v.course_code}</p>
-                          </div>
-                        </TableCell>
-                        <TableCell>
-                          <Badge variant="secondary">{v.violation_type}</Badge>
-                        </TableCell>
-                        <TableCell>
-                          {new Date(v.incident_date).toLocaleDateString()}
-                        </TableCell>
-                        <TableCell>
-                          <Badge className={cn('border', getStatusColor(v.dac_decision))}>
-                            {v.dac_decision}
-                          </Badge>
-                        </TableCell>
-                        <TableCell>
-                          <Badge className={cn('border', getStatusColor(v.cmc_decision))}>
-                            {v.cmc_decision}
-                          </Badge>
-                        </TableCell>
-                      </TableRow>
+                      <Collapsible
+                        key={v.id}
+                        open={expandedRow === v.id}
+                        onOpenChange={(open) => setExpandedRow(open ? v.id : null)}
+                      >
+                        <TableRow className="cursor-pointer hover:bg-muted/50">
+                          <TableCell>
+                            <CollapsibleTrigger asChild>
+                              <Button variant="ghost" size="icon" className="h-8 w-8">
+                                {expandedRow === v.id ? (
+                                  <ChevronUp className="h-4 w-4" />
+                                ) : (
+                                  <ChevronDown className="h-4 w-4" />
+                                )}
+                              </Button>
+                            </CollapsibleTrigger>
+                          </TableCell>
+                          <TableCell>
+                            <div className="flex items-center gap-2">
+                              <div>
+                                <ViolationHistoryDialog
+                                  studentId={v.students?.id}
+                                  studentName={v.students?.full_name}
+                                  studentIdNumber={v.students?.student_id}
+                                  trigger={
+                                    <button className="text-left hover:underline">
+                                      <p className="font-medium">{v.students?.full_name}</p>
+                                      <p className="text-sm text-muted-foreground">{v.students?.student_id}</p>
+                                    </button>
+                                  }
+                                />
+                              </div>
+                              {v.is_repeat_offender && (
+                                <Badge variant="destructive" className="text-xs">
+                                  <AlertTriangle className="h-3 w-3 mr-1" />
+                                  Repeat
+                                </Badge>
+                              )}
+                            </div>
+                          </TableCell>
+                          <TableCell>
+                            <Badge variant="outline">{v.students?.departments?.code || '—'}</Badge>
+                          </TableCell>
+                          <TableCell>
+                            <div>
+                              <p className="font-medium">{v.course_name}</p>
+                              <p className="text-sm text-muted-foreground">{v.course_code}</p>
+                            </div>
+                          </TableCell>
+                          <TableCell>
+                            <Badge variant="secondary">{v.violation_type}</Badge>
+                          </TableCell>
+                          <TableCell>
+                            <Badge className={cn('border', getWorkflowColor(v.workflow_status))}>
+                              {getWorkflowLabel(v.workflow_status)}
+                            </Badge>
+                          </TableCell>
+                          <TableCell>
+                            <Badge className={cn('border', getStatusColor(v.dac_decision))}>
+                              {v.dac_decision}
+                            </Badge>
+                          </TableCell>
+                          {canSeeCMC && (
+                            <TableCell>
+                              <Badge className={cn('border', getStatusColor(v.cmc_decision))}>
+                                {v.cmc_decision}
+                              </Badge>
+                            </TableCell>
+                          )}
+                        </TableRow>
+                        <CollapsibleContent asChild>
+                          <tr>
+                            <td colSpan={canSeeCMC ? 8 : 7} className="bg-muted/30 px-6 py-4">
+                              <div className="space-y-4">
+                                <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
+                                  <div>
+                                    <span className="text-muted-foreground">Date:</span>
+                                    <p className="font-medium">
+                                      {new Date(v.incident_date).toLocaleDateString()}
+                                    </p>
+                                  </div>
+                                  <div>
+                                    <span className="text-muted-foreground">Exam Type:</span>
+                                    <p className="font-medium">{v.exam_type}</p>
+                                  </div>
+                                  <div>
+                                    <span className="text-muted-foreground">Invigilator:</span>
+                                    <p className="font-medium">{v.invigilator}</p>
+                                  </div>
+                                  <div>
+                                    <span className="text-muted-foreground">Program:</span>
+                                    <p className="font-medium">{v.students?.program}</p>
+                                  </div>
+                                </div>
+                                
+                                {v.description && (
+                                  <div className="text-sm">
+                                    <span className="text-muted-foreground">Notes:</span>
+                                    <p className="mt-1 whitespace-pre-wrap">{v.description}</p>
+                                  </div>
+                                )}
+
+                                <div className="pt-2 border-t">
+                                  <WorkflowActions
+                                    violation={v}
+                                    onClose={() => setExpandedRow(null)}
+                                  />
+                                </div>
+                              </div>
+                            </td>
+                          </tr>
+                        </CollapsibleContent>
+                      </Collapsible>
                     ))}
                   </TableBody>
                 </Table>

@@ -24,6 +24,8 @@ import { supabase } from '@/integrations/supabase/client';
 import { ImportDialog } from '@/components/import/ImportDialog';
 import { ExportButton } from '@/components/export/ExportButton';
 import { StudentEditDialog } from '@/components/students/StudentEditDialog';
+import { StudentCreateDialog } from '@/components/students/StudentCreateDialog';
+import { ViolationHistoryDialog } from '@/components/violations/ViolationHistoryDialog';
 import { useAuth } from '@/contexts/AuthContext';
 
 const Students = () => {
@@ -96,6 +98,7 @@ const Students = () => {
             </p>
           </div>
           <div className="flex items-center gap-2">
+            {canEditStudents && <StudentCreateDialog />}
             {isSystemAdmin && <ImportDialog type="students" />}
             <ExportButton />
           </div>
@@ -179,16 +182,27 @@ const Students = () => {
                         <Badge variant="secondary">{student.program}</Badge>
                       </TableCell>
                       <TableCell>
-                        {student.violations?.length > 0 ? (
-                          <Badge variant="destructive" className="flex items-center gap-1 w-fit">
-                            <AlertTriangle className="h-3 w-3" />
-                            {student.violations.length}
-                          </Badge>
-                        ) : (
-                          <Badge variant="outline" className="text-muted-foreground">
-                            None
-                          </Badge>
-                        )}
+                        <ViolationHistoryDialog
+                          studentId={student.id}
+                          studentName={student.full_name}
+                          studentIdNumber={student.student_id}
+                          trigger={
+                            student.violations?.length > 0 ? (
+                              <button className="cursor-pointer">
+                                <Badge variant="destructive" className="flex items-center gap-1 w-fit hover:bg-destructive/80 transition-colors">
+                                  <AlertTriangle className="h-3 w-3" />
+                                  {student.violations.length}
+                                </Badge>
+                              </button>
+                            ) : (
+                              <button className="cursor-pointer">
+                                <Badge variant="outline" className="text-muted-foreground hover:bg-muted transition-colors">
+                                  None
+                                </Badge>
+                              </button>
+                            )
+                          }
+                        />
                       </TableCell>
                       {canEditStudents && (
                         <TableCell>
