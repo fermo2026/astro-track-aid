@@ -35,13 +35,21 @@ const violationTypes = [
   'Other',
 ];
 
-const decisionStatuses = [
+const dacDecisionStatuses = [
   'Pending',
-  'Warning Issued',
-  'Grade Penalty',
-  'Course Failure',
-  'Suspension',
-  'Expulsion',
+  'One Grade Down',
+  'F Grade for Course',
+  'F Grade with Disciplinary Action',
+  'Referred to Discipline Committee',
+  'Cleared',
+];
+
+const cmcDecisionStatuses = [
+  'Pending',
+  'One Grade Down',
+  'F Grade for Course',
+  'F Grade with Disciplinary Action',
+  'Referred to Discipline Committee',
   'Cleared',
 ];
 
@@ -302,44 +310,27 @@ export const ViolationDialog = ({ onSuccess }: ViolationDialogProps) => {
             </div>
           </div>
 
-          {/* Decisions */}
-          <div className="grid grid-cols-2 gap-4">
-            <div className="space-y-2">
-              <Label>DAC Decision</Label>
-              <Select
-                value={formData.dac_decision}
-                onValueChange={(v) => setFormData({ ...formData, dac_decision: v })}
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder="Select DAC decision" />
-                </SelectTrigger>
-                <SelectContent>
-                  {decisionStatuses.map((status) => (
-                    <SelectItem key={status} value={status}>
-                      {status}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="space-y-2">
-              <Label>CMC Decision</Label>
-              <Select
-                value={formData.cmc_decision}
-                onValueChange={(v) => setFormData({ ...formData, cmc_decision: v })}
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder="Select CMC decision" />
-                </SelectTrigger>
-                <SelectContent>
-                  {decisionStatuses.map((status) => (
-                    <SelectItem key={status} value={status}>
-                      {status}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
+          {/* DAC Decision - only show for initial recording */}
+          <div className="space-y-2">
+            <Label>DAC Decision (Initial)</Label>
+            <Select
+              value={formData.dac_decision}
+              onValueChange={(v) => setFormData({ ...formData, dac_decision: v })}
+            >
+              <SelectTrigger>
+                <SelectValue placeholder="Select DAC decision" />
+              </SelectTrigger>
+              <SelectContent>
+                {dacDecisionStatuses.map((status) => (
+                  <SelectItem key={status} value={status}>
+                    {status}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <p className="text-xs text-muted-foreground">
+              CMC decision will be set after approval workflow is complete.
+            </p>
           </div>
 
           <div className="space-y-2">

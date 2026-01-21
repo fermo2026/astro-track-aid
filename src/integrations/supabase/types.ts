@@ -192,6 +192,9 @@ export type Database = {
       }
       violations: {
         Row: {
+          approved_by_avd: string | null
+          approved_by_head: string | null
+          avd_approved_at: string | null
           cmc_decision: Database["public"]["Enums"]["decision_status"]
           cmc_decision_by: string | null
           cmc_decision_date: string | null
@@ -205,14 +208,22 @@ export type Database = {
           description: string | null
           evidence_url: string | null
           exam_type: Database["public"]["Enums"]["exam_type"]
+          head_approved_at: string | null
           id: string
           incident_date: string
           invigilator: string
+          is_repeat_offender: boolean
           student_id: string
+          submitted_at: string | null
+          submitted_by: string | null
           updated_at: string
           violation_type: Database["public"]["Enums"]["violation_type"]
+          workflow_status: Database["public"]["Enums"]["workflow_status"]
         }
         Insert: {
+          approved_by_avd?: string | null
+          approved_by_head?: string | null
+          avd_approved_at?: string | null
           cmc_decision?: Database["public"]["Enums"]["decision_status"]
           cmc_decision_by?: string | null
           cmc_decision_date?: string | null
@@ -226,14 +237,22 @@ export type Database = {
           description?: string | null
           evidence_url?: string | null
           exam_type: Database["public"]["Enums"]["exam_type"]
+          head_approved_at?: string | null
           id?: string
           incident_date: string
           invigilator: string
+          is_repeat_offender?: boolean
           student_id: string
+          submitted_at?: string | null
+          submitted_by?: string | null
           updated_at?: string
           violation_type: Database["public"]["Enums"]["violation_type"]
+          workflow_status?: Database["public"]["Enums"]["workflow_status"]
         }
         Update: {
+          approved_by_avd?: string | null
+          approved_by_head?: string | null
+          avd_approved_at?: string | null
           cmc_decision?: Database["public"]["Enums"]["decision_status"]
           cmc_decision_by?: string | null
           cmc_decision_date?: string | null
@@ -247,12 +266,17 @@ export type Database = {
           description?: string | null
           evidence_url?: string | null
           exam_type?: Database["public"]["Enums"]["exam_type"]
+          head_approved_at?: string | null
           id?: string
           incident_date?: string
           invigilator?: string
+          is_repeat_offender?: boolean
           student_id?: string
+          submitted_at?: string | null
+          submitted_by?: string | null
           updated_at?: string
           violation_type?: Database["public"]["Enums"]["violation_type"]
+          workflow_status?: Database["public"]["Enums"]["workflow_status"]
         }
         Relationships: [
           {
@@ -301,6 +325,10 @@ export type Database = {
         | "Suspension"
         | "Expulsion"
         | "Cleared"
+        | "One Grade Down"
+        | "F Grade for Course"
+        | "F Grade with Disciplinary Action"
+        | "Referred to Discipline Committee"
       exam_type: "Mid Exam" | "Final Exam"
       program_type: "BSc" | "MSc" | "PhD"
       violation_type:
@@ -311,6 +339,15 @@ export type Database = {
         | "Plagiarism"
         | "Impersonation"
         | "Other"
+      workflow_status:
+        | "draft"
+        | "submitted_to_head"
+        | "approved_by_head"
+        | "submitted_to_avd"
+        | "approved_by_avd"
+        | "pending_cmc"
+        | "cmc_decided"
+        | "closed"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -456,6 +493,10 @@ export const Constants = {
         "Suspension",
         "Expulsion",
         "Cleared",
+        "One Grade Down",
+        "F Grade for Course",
+        "F Grade with Disciplinary Action",
+        "Referred to Discipline Committee",
       ],
       exam_type: ["Mid Exam", "Final Exam"],
       program_type: ["BSc", "MSc", "PhD"],
@@ -467,6 +508,16 @@ export const Constants = {
         "Plagiarism",
         "Impersonation",
         "Other",
+      ],
+      workflow_status: [
+        "draft",
+        "submitted_to_head",
+        "approved_by_head",
+        "submitted_to_avd",
+        "approved_by_avd",
+        "pending_cmc",
+        "cmc_decided",
+        "closed",
       ],
     },
   },

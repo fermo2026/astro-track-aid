@@ -27,11 +27,10 @@ const violationTypes = [
 
 const decisionStatuses = [
   'Pending',
-  'Warning Issued',
-  'Grade Penalty',
-  'Course Failure',
-  'Suspension',
-  'Expulsion',
+  'One Grade Down',
+  'F Grade for Course',
+  'F Grade with Disciplinary Action',
+  'Referred to Discipline Committee',
   'Cleared',
 ];
 
