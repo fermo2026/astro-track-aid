@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
@@ -21,7 +21,7 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { toast } from 'sonner';
-import { Plus, Loader2 } from 'lucide-react';
+import { Plus, Loader2, Pencil } from 'lucide-react';
 
 interface DepartmentFormProps {
   department?: {
@@ -31,15 +31,24 @@ interface DepartmentFormProps {
     college_id: string | null;
   };
   onSuccess?: () => void;
+  trigger?: React.ReactNode;
 }
 
-export const DepartmentForm = ({ department, onSuccess }: DepartmentFormProps) => {
+export const DepartmentForm = ({ department, onSuccess, trigger }: DepartmentFormProps) => {
   const [open, setOpen] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [name, setName] = useState(department?.name || '');
   const [code, setCode] = useState(department?.code || '');
   const [collegeId, setCollegeId] = useState(department?.college_id || '');
   const queryClient = useQueryClient();
+
+  useEffect(() => {
+    if (open && department) {
+      setName(department.name);
+      setCode(department.code);
+      setCollegeId(department.college_id || '');
+    }
+  }, [open, department]);
 
   const { data: colleges } = useQuery({
     queryKey: ['colleges'],
@@ -83,9 +92,11 @@ export const DepartmentForm = ({ department, onSuccess }: DepartmentFormProps) =
 
       queryClient.invalidateQueries({ queryKey: ['departments'] });
       setOpen(false);
-      setName('');
-      setCode('');
-      setCollegeId('');
+      if (!department) {
+        setName('');
+        setCode('');
+        setCollegeId('');
+      }
       onSuccess?.();
     } catch (error: any) {
       toast.error(error.message || 'Failed to save department');
@@ -97,10 +108,18 @@ export const DepartmentForm = ({ department, onSuccess }: DepartmentFormProps) =
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>
-        <Button variant={department ? 'outline' : 'default'}>
-          <Plus className="h-4 w-4 mr-2" />
-          {department ? 'Edit' : 'Add Department'}
-        </Button>
+        {trigger || (
+          <Button variant={department ? 'ghost' : 'default'} size={department ? 'icon' : 'default'}>
+            {department ? (
+              <Pencil className="h-4 w-4" />
+            ) : (
+              <>
+                <Plus className="h-4 w-4 mr-2" />
+                Add Department
+              </>
+            )}
+          </Button>
+        )}
       </DialogTrigger>
       <DialogContent>
         <DialogHeader>

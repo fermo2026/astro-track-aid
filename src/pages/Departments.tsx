@@ -1,11 +1,12 @@
 import { useQuery } from '@tanstack/react-query';
 import { MainLayout } from '@/components/layout/MainLayout';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent } from '@/components/ui/card';
 import { Building2, GraduationCap, Loader2 } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { CollegeForm } from '@/components/colleges/CollegeForm';
 import { DepartmentForm } from '@/components/departments/DepartmentForm';
+import { DeleteDepartmentDialog } from '@/components/departments/DeleteDepartmentDialog';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import {
   Table,
@@ -91,6 +92,7 @@ const Departments = () => {
                         <TableHead>Department Name</TableHead>
                         <TableHead>Code</TableHead>
                         <TableHead>College</TableHead>
+                        {canAddDepartment && <TableHead className="w-24">Actions</TableHead>}
                       </TableRow>
                     </TableHeader>
                     <TableBody>
@@ -107,6 +109,23 @@ const Departments = () => {
                               <span className="text-muted-foreground">—</span>
                             )}
                           </TableCell>
+                          {canAddDepartment && (
+                            <TableCell>
+                              <div className="flex items-center gap-1">
+                                <DepartmentForm
+                                  department={{
+                                    id: dept.id,
+                                    name: dept.name,
+                                    code: dept.code,
+                                    college_id: dept.college_id,
+                                  }}
+                                />
+                                <DeleteDepartmentDialog
+                                  department={{ id: dept.id, name: dept.name }}
+                                />
+                              </div>
+                            </TableCell>
+                          )}
                         </TableRow>
                       ))}
                     </TableBody>
