@@ -201,12 +201,12 @@ export const UserEditDialog = ({ user, open, onOpenChange, onSuccess, currentUse
 
           <div className="space-y-2">
             <Label>Department (optional)</Label>
-            <Select value={selectedDepartment} onValueChange={setSelectedDepartment}>
+            <Select value={selectedDepartment || '__none__'} onValueChange={(val) => setSelectedDepartment(val === '__none__' ? '' : val)}>
               <SelectTrigger>
                 <SelectValue placeholder="Select department" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="">No department</SelectItem>
+                <SelectItem value="__none__">No department</SelectItem>
                 {departments?.map((dept) => (
                   <SelectItem key={dept.id} value={dept.id}>
                     {dept.name}
