@@ -1,9 +1,12 @@
+import { useState } from 'react';
 import { MainLayout } from '@/components/layout/MainLayout';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { Shield, UserCheck, Users, Loader2 } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { Shield, UserCheck, Users, Loader2, Pencil } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { InviteUserForm } from '@/components/users/InviteUserForm';
+import { UserEditDialog } from '@/components/users/UserEditDialog';
 import { supabase } from '@/integrations/supabase/client';
 import { useQuery } from '@tanstack/react-query';
 import {
@@ -80,7 +83,8 @@ const getRoleLabel = (role: string) => {
 };
 
 const UsersRoles = () => {
-  const { isSystemAdmin } = useAuth();
+  const { isSystemAdmin, user } = useAuth();
+  const [editingUser, setEditingUser] = useState<any>(null);
 
   const { data: users, isLoading: usersLoading, refetch } = useQuery({
     queryKey: ['users-with-roles'],
@@ -149,29 +153,30 @@ const UsersRoles = () => {
                       <TableHead>Email</TableHead>
                       <TableHead>Role(s)</TableHead>
                       <TableHead>Status</TableHead>
+                      <TableHead className="text-right">Actions</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {users.map((user) => (
-                      <TableRow key={user.id}>
+                    {users.map((usr) => (
+                      <TableRow key={usr.id}>
                         <TableCell className="font-medium">
-                          {user.full_name || 'N/A'}
+                          {usr.full_name || 'N/A'}
                         </TableCell>
-                        <TableCell>{user.email}</TableCell>
+                        <TableCell>{usr.email}</TableCell>
                         <TableCell>
                           <div className="flex flex-wrap gap-1">
-                            {user.roles.map((r: any, idx: number) => (
+                            {usr.roles.map((r: any, idx: number) => (
                               <Badge key={idx} variant="secondary">
                                 {getRoleLabel(r.role)}
                               </Badge>
                             ))}
-                            {user.roles.length === 0 && (
+                            {usr.roles.length === 0 && (
                               <span className="text-muted-foreground text-sm">No role</span>
                             )}
                           </div>
                         </TableCell>
                         <TableCell>
-                          {user.must_change_password ? (
+                          {usr.must_change_password ? (
                             <Badge variant="outline" className="text-warning border-warning">
                               Pending Password Change
                             </Badge>
@@ -180,6 +185,17 @@ const UsersRoles = () => {
                               Active
                             </Badge>
                           )}
+                        </TableCell>
+                        <TableCell className="text-right">
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => setEditingUser(usr)}
+                            className="gap-1"
+                          >
+                            <Pencil className="h-4 w-4" />
+                            Edit
+                          </Button>
                         </TableCell>
                       </TableRow>
                     ))}
@@ -192,6 +208,16 @@ const UsersRoles = () => {
               )}
             </CardContent>
           </Card>
+        )}
+
+        {editingUser && (
+          <UserEditDialog
+            user={editingUser}
+            open={!!editingUser}
+            onOpenChange={(open) => !open && setEditingUser(null)}
+            onSuccess={() => refetch()}
+            currentUserId={user?.id || ''}
+          />
         )}
 
         {/* Role Hierarchy */}
