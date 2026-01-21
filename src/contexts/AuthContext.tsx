@@ -8,6 +8,7 @@ interface UserProfile {
   full_name: string | null;
   must_change_password: boolean;
   department_id: string | null;
+  avatar_url: string | null;
 }
 
 interface UserRole {
@@ -25,6 +26,7 @@ interface AuthContextType {
   mustChangePassword: boolean;
   signIn: (email: string, password: string) => Promise<{ error: Error | null }>;
   signOut: () => Promise<void>;
+  refreshProfile: () => Promise<void>;
   updatePassword: (newPassword: string) => Promise<{ error: Error | null }>;
 }
 
@@ -54,7 +56,7 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
       // Fetch profile
       const { data: profileData, error: profileError } = await supabase
         .from('profiles')
-        .select('id, email, full_name, must_change_password, department_id')
+        .select('id, email, full_name, must_change_password, department_id, avatar_url')
         .eq('id', userId)
         .single();
 
@@ -129,6 +131,12 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
     setRoles([]);
   };
 
+  const refreshProfile = async () => {
+    if (user) {
+      await fetchUserData(user.id);
+    }
+  };
+
   const updatePassword = async (newPassword: string) => {
     const { error } = await supabase.auth.updateUser({
       password: newPassword,
@@ -163,6 +171,7 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
         mustChangePassword,
         signIn,
         signOut,
+        refreshProfile,
         updatePassword,
       }}
     >

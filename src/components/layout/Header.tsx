@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { Bell, Search, User, LogOut } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
@@ -10,8 +11,9 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
-import { Avatar, AvatarFallback } from '@/components/ui/avatar';
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { useAuth } from '@/contexts/AuthContext';
+import { ProfileEditDialog } from '@/components/profile/ProfileEditDialog';
 import astuLogo from '@/assets/astu-logo.png';
 
 interface HeaderProps {
@@ -21,6 +23,7 @@ interface HeaderProps {
 export const Header = ({ onSearch }: HeaderProps) => {
   const { profile, roles, signOut } = useAuth();
   const navigate = useNavigate();
+  const [profileDialogOpen, setProfileDialogOpen] = useState(false);
 
   const handleLogout = async () => {
     await signOut();
@@ -87,6 +90,7 @@ export const Header = ({ onSearch }: HeaderProps) => {
           <DropdownMenuTrigger asChild>
             <Button variant="ghost" className="flex items-center gap-2 text-primary-foreground hover:bg-primary-foreground/10">
               <Avatar className="h-8 w-8">
+                <AvatarImage src={profile?.avatar_url || undefined} alt={profile?.full_name || 'User'} />
                 <AvatarFallback className="bg-secondary text-secondary-foreground text-sm font-semibold">
                   {getInitials(profile?.full_name)}
                 </AvatarFallback>
@@ -102,7 +106,7 @@ export const Header = ({ onSearch }: HeaderProps) => {
           <DropdownMenuContent align="end" className="w-56">
             <DropdownMenuLabel>My Account</DropdownMenuLabel>
             <DropdownMenuSeparator />
-            <DropdownMenuItem>
+            <DropdownMenuItem onClick={() => setProfileDialogOpen(true)}>
               <User className="mr-2 h-4 w-4" />
               Profile
             </DropdownMenuItem>
@@ -117,6 +121,8 @@ export const Header = ({ onSearch }: HeaderProps) => {
           </DropdownMenuContent>
         </DropdownMenu>
       </div>
+
+      <ProfileEditDialog open={profileDialogOpen} onOpenChange={setProfileDialogOpen} />
     </header>
   );
 };
