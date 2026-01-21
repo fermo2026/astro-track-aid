@@ -241,6 +241,7 @@ export type Database = {
         | "college_registrar"
         | "main_registrar"
         | "vpaa"
+        | "system_admin"
       decision_status:
         | "Pending"
         | "Warning Issued"
@@ -394,6 +395,7 @@ export const Constants = {
         "college_registrar",
         "main_registrar",
         "vpaa",
+        "system_admin",
       ],
       decision_status: [
         "Pending",
