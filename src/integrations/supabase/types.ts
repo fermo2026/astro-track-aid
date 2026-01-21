@@ -14,16 +14,251 @@ export type Database = {
   }
   public: {
     Tables: {
-      [_ in never]: never
+      departments: {
+        Row: {
+          code: string
+          created_at: string
+          id: string
+          name: string
+          updated_at: string
+        }
+        Insert: {
+          code: string
+          created_at?: string
+          id?: string
+          name: string
+          updated_at?: string
+        }
+        Update: {
+          code?: string
+          created_at?: string
+          id?: string
+          name?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      profiles: {
+        Row: {
+          created_at: string
+          department_id: string | null
+          email: string | null
+          full_name: string | null
+          id: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          department_id?: string | null
+          email?: string | null
+          full_name?: string | null
+          id: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          department_id?: string | null
+          email?: string | null
+          full_name?: string | null
+          id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "profiles_department_id_fkey"
+            columns: ["department_id"]
+            isOneToOne: false
+            referencedRelation: "departments"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      students: {
+        Row: {
+          created_at: string
+          department_id: string | null
+          full_name: string
+          id: string
+          program: Database["public"]["Enums"]["program_type"]
+          student_id: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          department_id?: string | null
+          full_name: string
+          id?: string
+          program?: Database["public"]["Enums"]["program_type"]
+          student_id: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          department_id?: string | null
+          full_name?: string
+          id?: string
+          program?: Database["public"]["Enums"]["program_type"]
+          student_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "students_department_id_fkey"
+            columns: ["department_id"]
+            isOneToOne: false
+            referencedRelation: "departments"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      user_roles: {
+        Row: {
+          created_at: string
+          department_id: string | null
+          id: string
+          role: Database["public"]["Enums"]["app_role"]
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          department_id?: string | null
+          id?: string
+          role: Database["public"]["Enums"]["app_role"]
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          department_id?: string | null
+          id?: string
+          role?: Database["public"]["Enums"]["app_role"]
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "user_roles_department_id_fkey"
+            columns: ["department_id"]
+            isOneToOne: false
+            referencedRelation: "departments"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      violations: {
+        Row: {
+          cmc_decision: Database["public"]["Enums"]["decision_status"]
+          cmc_decision_by: string | null
+          cmc_decision_date: string | null
+          course_code: string
+          course_name: string
+          created_at: string
+          created_by: string | null
+          dac_decision: Database["public"]["Enums"]["decision_status"]
+          dac_decision_by: string | null
+          dac_decision_date: string | null
+          description: string | null
+          evidence_url: string | null
+          exam_type: Database["public"]["Enums"]["exam_type"]
+          id: string
+          incident_date: string
+          invigilator: string
+          student_id: string
+          updated_at: string
+          violation_type: Database["public"]["Enums"]["violation_type"]
+        }
+        Insert: {
+          cmc_decision?: Database["public"]["Enums"]["decision_status"]
+          cmc_decision_by?: string | null
+          cmc_decision_date?: string | null
+          course_code: string
+          course_name: string
+          created_at?: string
+          created_by?: string | null
+          dac_decision?: Database["public"]["Enums"]["decision_status"]
+          dac_decision_by?: string | null
+          dac_decision_date?: string | null
+          description?: string | null
+          evidence_url?: string | null
+          exam_type: Database["public"]["Enums"]["exam_type"]
+          id?: string
+          incident_date: string
+          invigilator: string
+          student_id: string
+          updated_at?: string
+          violation_type: Database["public"]["Enums"]["violation_type"]
+        }
+        Update: {
+          cmc_decision?: Database["public"]["Enums"]["decision_status"]
+          cmc_decision_by?: string | null
+          cmc_decision_date?: string | null
+          course_code?: string
+          course_name?: string
+          created_at?: string
+          created_by?: string | null
+          dac_decision?: Database["public"]["Enums"]["decision_status"]
+          dac_decision_by?: string | null
+          dac_decision_date?: string | null
+          description?: string | null
+          evidence_url?: string | null
+          exam_type?: Database["public"]["Enums"]["exam_type"]
+          id?: string
+          incident_date?: string
+          invigilator?: string
+          student_id?: string
+          updated_at?: string
+          violation_type?: Database["public"]["Enums"]["violation_type"]
+        }
+        Relationships: [
+          {
+            foreignKeyName: "violations_student_id_fkey"
+            columns: ["student_id"]
+            isOneToOne: false
+            referencedRelation: "students"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
     }
     Views: {
       [_ in never]: never
     }
     Functions: {
-      [_ in never]: never
+      get_user_department: { Args: { _user_id: string }; Returns: string }
+      has_any_role: { Args: { _user_id: string }; Returns: boolean }
+      has_role: {
+        Args: {
+          _role: Database["public"]["Enums"]["app_role"]
+          _user_id: string
+        }
+        Returns: boolean
+      }
     }
     Enums: {
-      [_ in never]: never
+      app_role:
+        | "deputy_department_head"
+        | "department_head"
+        | "academic_vice_dean"
+        | "college_dean"
+        | "college_registrar"
+        | "main_registrar"
+        | "vpaa"
+      decision_status:
+        | "Pending"
+        | "Warning Issued"
+        | "Grade Penalty"
+        | "Course Failure"
+        | "Suspension"
+        | "Expulsion"
+        | "Cleared"
+      exam_type: "Mid Exam" | "Final Exam"
+      program_type: "BSc" | "MSc" | "PhD"
+      violation_type:
+        | "Cheating with Notes"
+        | "Using Electronic Device"
+        | "Copying from Another Student"
+        | "Collaboration"
+        | "Plagiarism"
+        | "Impersonation"
+        | "Other"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -150,6 +385,36 @@ export type CompositeTypes<
 
 export const Constants = {
   public: {
-    Enums: {},
+    Enums: {
+      app_role: [
+        "deputy_department_head",
+        "department_head",
+        "academic_vice_dean",
+        "college_dean",
+        "college_registrar",
+        "main_registrar",
+        "vpaa",
+      ],
+      decision_status: [
+        "Pending",
+        "Warning Issued",
+        "Grade Penalty",
+        "Course Failure",
+        "Suspension",
+        "Expulsion",
+        "Cleared",
+      ],
+      exam_type: ["Mid Exam", "Final Exam"],
+      program_type: ["BSc", "MSc", "PhD"],
+      violation_type: [
+        "Cheating with Notes",
+        "Using Electronic Device",
+        "Copying from Another Student",
+        "Collaboration",
+        "Plagiarism",
+        "Impersonation",
+        "Other",
+      ],
+    },
   },
 } as const
