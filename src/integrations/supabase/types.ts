@@ -14,7 +14,7 @@ export type Database = {
   }
   public: {
     Tables: {
-      departments: {
+      colleges: {
         Row: {
           code: string
           created_at: string
@@ -37,6 +37,41 @@ export type Database = {
           updated_at?: string
         }
         Relationships: []
+      }
+      departments: {
+        Row: {
+          code: string
+          college_id: string | null
+          created_at: string
+          id: string
+          name: string
+          updated_at: string
+        }
+        Insert: {
+          code: string
+          college_id?: string | null
+          created_at?: string
+          id?: string
+          name: string
+          updated_at?: string
+        }
+        Update: {
+          code?: string
+          college_id?: string | null
+          created_at?: string
+          id?: string
+          name?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "departments_college_id_fkey"
+            columns: ["college_id"]
+            isOneToOne: false
+            referencedRelation: "colleges"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       profiles: {
         Row: {
@@ -241,6 +276,10 @@ export type Database = {
           _role: Database["public"]["Enums"]["app_role"]
           _user_id: string
         }
+        Returns: boolean
+      }
+      user_has_department_access: {
+        Args: { _department_id: string; _user_id: string }
         Returns: boolean
       }
     }
