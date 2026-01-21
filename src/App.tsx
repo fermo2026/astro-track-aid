@@ -7,7 +7,6 @@ import { AuthProvider } from "@/contexts/AuthContext";
 import { ProtectedRoute } from "@/components/auth/ProtectedRoute";
 import Dashboard from "./pages/Dashboard";
 import Violations from "./pages/Violations";
-import NewViolation from "./pages/NewViolation";
 import Students from "./pages/Students";
 import Departments from "./pages/Departments";
 import UsersRoles from "./pages/UsersRoles";
@@ -41,14 +40,6 @@ const App = () => (
               element={
                 <ProtectedRoute>
                   <Violations />
-                </ProtectedRoute>
-              }
-            />
-            <Route
-              path="/new-violation"
-              element={
-                <ProtectedRoute>
-                  <NewViolation />
                 </ProtectedRoute>
               }
             />

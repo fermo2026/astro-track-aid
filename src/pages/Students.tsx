@@ -3,7 +3,6 @@ import { useQuery } from '@tanstack/react-query';
 import { MainLayout } from '@/components/layout/MainLayout';
 import { Card, CardContent } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
-import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import {
   Table,
@@ -24,13 +23,18 @@ import { Users, Loader2, Search, AlertTriangle } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { ImportDialog } from '@/components/import/ImportDialog';
 import { ExportButton } from '@/components/export/ExportButton';
+import { StudentEditDialog } from '@/components/students/StudentEditDialog';
 import { useAuth } from '@/contexts/AuthContext';
 
 const Students = () => {
   const [searchQuery, setSearchQuery] = useState('');
   const [departmentFilter, setDepartmentFilter] = useState('all');
   const [programFilter, setProgramFilter] = useState('all');
-  const { isSystemAdmin } = useAuth();
+  const { isSystemAdmin, roles } = useAuth();
+  
+  const isHead = roles.some(r => r.role === 'department_head' || r.role === 'deputy_department_head');
+  const isAVD = roles.some(r => r.role === 'academic_vice_dean');
+  const canEditStudents = isSystemAdmin || isHead || isAVD;
 
   const { data: departments } = useQuery({
     queryKey: ['departments'],
@@ -154,6 +158,7 @@ const Students = () => {
                     <TableHead>Department</TableHead>
                     <TableHead>Program</TableHead>
                     <TableHead>Violations</TableHead>
+                    {canEditStudents && <TableHead className="w-16">Edit</TableHead>}
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -185,6 +190,19 @@ const Students = () => {
                           </Badge>
                         )}
                       </TableCell>
+                      {canEditStudents && (
+                        <TableCell>
+                          <StudentEditDialog
+                            student={{
+                              id: student.id,
+                              student_id: student.student_id,
+                              full_name: student.full_name,
+                              program: student.program,
+                              department_id: student.department_id,
+                            }}
+                          />
+                        </TableCell>
+                      )}
                     </TableRow>
                   ))}
                 </TableBody>
