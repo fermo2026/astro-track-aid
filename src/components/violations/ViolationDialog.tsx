@@ -91,21 +91,17 @@ export const ViolationDialog = ({ onSuccess }: ViolationDialogProps) => {
   const { data: students, isLoading: studentsLoading } = useQuery({
     queryKey: ['students-search', studentSearch],
     queryFn: async () => {
-      let query = supabase
+      const { data, error } = await supabase
         .from('students')
         .select('id, student_id, full_name, departments(name)')
+        .or(`full_name.ilike.%${studentSearch}%,student_id.ilike.%${studentSearch}%`)
         .order('full_name')
         .limit(10);
 
-      if (studentSearch) {
-        query = query.or(`full_name.ilike.%${studentSearch}%,student_id.ilike.%${studentSearch}%`);
-      }
-
-      const { data, error } = await query;
       if (error) throw error;
       return data;
     },
-    enabled: open,
+    enabled: open && studentSearch.length >= 2,
   });
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -186,7 +182,7 @@ export const ViolationDialog = ({ onSuccess }: ViolationDialogProps) => {
 
         <form onSubmit={handleSubmit} className="space-y-6">
           {/* Student Selection */}
-          <div className="space-y-3">
+          <div className="space-y-2">
             <Label>Student *</Label>
             {selectedStudent && selectedStudentData ? (
               <div className="flex items-center justify-between p-3 bg-muted rounded-lg">
@@ -201,35 +197,43 @@ export const ViolationDialog = ({ onSuccess }: ViolationDialogProps) => {
                 </Button>
               </div>
             ) : (
-              <div className="space-y-2">
+              <div className="relative">
                 <Input
-                  placeholder="Search student by name or ID..."
+                  placeholder="Type student ID or name to search..."
                   value={studentSearch}
                   onChange={(e) => setStudentSearch(e.target.value)}
                 />
-                {studentsLoading ? (
-                  <div className="flex items-center justify-center py-4">
-                    <Loader2 className="h-5 w-5 animate-spin" />
+                {studentSearch.length >= 2 && (
+                  <div className="absolute z-50 w-full mt-1 bg-popover border rounded-lg shadow-lg max-h-48 overflow-y-auto">
+                    {studentsLoading ? (
+                      <div className="flex items-center justify-center py-4">
+                        <Loader2 className="h-5 w-5 animate-spin" />
+                      </div>
+                    ) : students && students.length > 0 ? (
+                      students.map((student: any) => (
+                        <button
+                          key={student.id}
+                          type="button"
+                          className="w-full text-left px-3 py-2 hover:bg-accent transition-colors border-b last:border-0"
+                          onClick={() => {
+                            setSelectedStudent(student.id);
+                            setStudentSearch('');
+                          }}
+                        >
+                          <p className="font-medium">{student.full_name}</p>
+                          <p className="text-sm text-muted-foreground">
+                            {student.student_id} • {student.departments?.name}
+                          </p>
+                        </button>
+                      ))
+                    ) : (
+                      <p className="text-sm text-muted-foreground text-center py-4">No students found</p>
+                    )}
                   </div>
-                ) : students && students.length > 0 ? (
-                  <div className="border rounded-lg max-h-40 overflow-y-auto">
-                    {students.map((student: any) => (
-                      <button
-                        key={student.id}
-                        type="button"
-                        className="w-full text-left px-3 py-2 hover:bg-muted transition-colors border-b last:border-0"
-                        onClick={() => setSelectedStudent(student.id)}
-                      >
-                        <p className="font-medium">{student.full_name}</p>
-                        <p className="text-sm text-muted-foreground">
-                          {student.student_id} • {student.departments?.name}
-                        </p>
-                      </button>
-                    ))}
-                  </div>
-                ) : studentSearch ? (
-                  <p className="text-sm text-muted-foreground text-center py-4">No students found</p>
-                ) : null}
+                )}
+                {studentSearch.length > 0 && studentSearch.length < 2 && (
+                  <p className="text-xs text-muted-foreground mt-1">Type at least 2 characters to search</p>
+                )}
               </div>
             )}
           </div>
