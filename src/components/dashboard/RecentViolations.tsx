@@ -1,7 +1,8 @@
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { mockViolations } from '@/data/mockData';
+import { useRecentViolations } from '@/hooks/useDashboardStats';
 import { cn } from '@/lib/utils';
+import { Loader2 } from 'lucide-react';
 
 const getStatusColor = (status: string) => {
   switch (status) {
@@ -23,7 +24,7 @@ const getStatusColor = (status: string) => {
 };
 
 export const RecentViolations = () => {
-  const recentViolations = mockViolations.slice(0, 5);
+  const { data: recentViolations, isLoading } = useRecentViolations();
 
   return (
     <Card className="col-span-full">
@@ -34,44 +35,54 @@ export const RecentViolations = () => {
         </a>
       </CardHeader>
       <CardContent>
-        <div className="overflow-x-auto">
-          <table className="w-full">
-            <thead>
-              <tr className="border-b border-border">
-                <th className="text-left py-3 px-4 text-sm font-medium text-muted-foreground">Student</th>
-                <th className="text-left py-3 px-4 text-sm font-medium text-muted-foreground">ID</th>
-                <th className="text-left py-3 px-4 text-sm font-medium text-muted-foreground">Department</th>
-                <th className="text-left py-3 px-4 text-sm font-medium text-muted-foreground">Violation Type</th>
-                <th className="text-left py-3 px-4 text-sm font-medium text-muted-foreground">Date</th>
-                <th className="text-left py-3 px-4 text-sm font-medium text-muted-foreground">Status</th>
-              </tr>
-            </thead>
-            <tbody>
-              {recentViolations.map((violation) => (
-                <tr key={violation.id} className="data-table-row border-b border-border/50">
-                  <td className="py-3 px-4">
-                    <span className="font-medium text-foreground">{violation.studentFullName}</span>
-                  </td>
-                  <td className="py-3 px-4 text-muted-foreground">{violation.studentId}</td>
-                  <td className="py-3 px-4 text-muted-foreground">{violation.department}</td>
-                  <td className="py-3 px-4">
-                    <Badge variant="outline" className="font-normal">
-                      {violation.violationType}
-                    </Badge>
-                  </td>
-                  <td className="py-3 px-4 text-muted-foreground">
-                    {new Date(violation.incidentDate).toLocaleDateString()}
-                  </td>
-                  <td className="py-3 px-4">
-                    <Badge className={cn('border', getStatusColor(violation.dacDecision))}>
-                      {violation.dacDecision}
-                    </Badge>
-                  </td>
+        {isLoading ? (
+          <div className="flex items-center justify-center py-10">
+            <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+          </div>
+        ) : recentViolations && recentViolations.length > 0 ? (
+          <div className="overflow-x-auto">
+            <table className="w-full">
+              <thead>
+                <tr className="border-b border-border">
+                  <th className="text-left py-3 px-4 text-sm font-medium text-muted-foreground">Student</th>
+                  <th className="text-left py-3 px-4 text-sm font-medium text-muted-foreground">ID</th>
+                  <th className="text-left py-3 px-4 text-sm font-medium text-muted-foreground">Department</th>
+                  <th className="text-left py-3 px-4 text-sm font-medium text-muted-foreground">Violation Type</th>
+                  <th className="text-left py-3 px-4 text-sm font-medium text-muted-foreground">Date</th>
+                  <th className="text-left py-3 px-4 text-sm font-medium text-muted-foreground">Status</th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+              </thead>
+              <tbody>
+                {recentViolations.map((violation: any) => (
+                  <tr key={violation.id} className="data-table-row border-b border-border/50">
+                    <td className="py-3 px-4">
+                      <span className="font-medium text-foreground">{violation.students?.full_name}</span>
+                    </td>
+                    <td className="py-3 px-4 text-muted-foreground">{violation.students?.student_id}</td>
+                    <td className="py-3 px-4 text-muted-foreground">{violation.students?.departments?.name}</td>
+                    <td className="py-3 px-4">
+                      <Badge variant="outline" className="font-normal">
+                        {violation.violation_type}
+                      </Badge>
+                    </td>
+                    <td className="py-3 px-4 text-muted-foreground">
+                      {new Date(violation.incident_date).toLocaleDateString()}
+                    </td>
+                    <td className="py-3 px-4">
+                      <Badge className={cn('border', getStatusColor(violation.dac_decision))}>
+                        {violation.dac_decision}
+                      </Badge>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        ) : (
+          <div className="text-center py-10 text-muted-foreground">
+            No violations recorded yet
+          </div>
+        )}
       </CardContent>
     </Card>
   );
