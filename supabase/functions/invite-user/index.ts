@@ -42,14 +42,12 @@ serve(async (req: Request): Promise<Response> => {
       );
     }
 
-    // Create client with user's token to verify permissions
-    const supabaseClient = createClient(supabaseUrl, Deno.env.get("SUPABASE_ANON_KEY")!, {
-      global: { headers: { Authorization: authHeader } },
-    });
-
-    // Get the current user
-    const { data: { user: invitingUser }, error: userError } = await supabaseClient.auth.getUser();
+    // Get the user from the JWT token using the admin client
+    const token = authHeader.replace("Bearer ", "");
+    const { data: { user: invitingUser }, error: userError } = await supabaseAdmin.auth.getUser(token);
+    
     if (userError || !invitingUser) {
+      console.error("Error getting user:", userError);
       return new Response(
         JSON.stringify({ error: "Invalid user" }),
         { status: 401, headers: { "Content-Type": "application/json", ...corsHeaders } }
