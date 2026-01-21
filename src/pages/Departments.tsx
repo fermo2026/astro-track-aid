@@ -7,6 +7,8 @@ import { useAuth } from '@/contexts/AuthContext';
 import { CollegeForm } from '@/components/colleges/CollegeForm';
 import { DepartmentForm } from '@/components/departments/DepartmentForm';
 import { DeleteDepartmentDialog } from '@/components/departments/DeleteDepartmentDialog';
+import { ImportDialog } from '@/components/import/ImportDialog';
+import { ExportButton } from '@/components/export/ExportButton';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import {
   Table,
@@ -59,6 +61,7 @@ const Departments = () => {
               Manage colleges and departments
             </p>
           </div>
+          <ExportButton />
         </div>
 
         <Tabs defaultValue="departments" className="w-full">
@@ -76,7 +79,10 @@ const Departments = () => {
           <TabsContent value="departments" className="space-y-4">
             <div className="flex justify-between items-center">
               <h2 className="text-lg font-semibold">Departments</h2>
-              {canAddDepartment && <DepartmentForm />}
+              <div className="flex items-center gap-2">
+                {isSystemAdmin && <ImportDialog type="departments" />}
+                {canAddDepartment && <DepartmentForm />}
+              </div>
             </div>
 
             <Card>
@@ -143,7 +149,10 @@ const Departments = () => {
           <TabsContent value="colleges" className="space-y-4">
             <div className="flex justify-between items-center">
               <h2 className="text-lg font-semibold">Colleges</h2>
-              {isSystemAdmin && <CollegeForm />}
+              <div className="flex items-center gap-2">
+                {isSystemAdmin && <ImportDialog type="colleges" />}
+                {isSystemAdmin && <CollegeForm />}
+              </div>
             </div>
 
             <Card>
