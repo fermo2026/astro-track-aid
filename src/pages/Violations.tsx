@@ -228,15 +228,19 @@ const Violations = () => {
               <div className="overflow-x-auto">
                 <Table>
                   <TableHeader>
-                    <TableRow>
-                      <TableHead className="w-10"></TableHead>
-                      <TableHead>Student</TableHead>
-                      <TableHead>Department</TableHead>
-                      <TableHead>Course</TableHead>
-                      <TableHead>Violation</TableHead>
-                      <TableHead>Workflow</TableHead>
-                      <TableHead>DAC</TableHead>
-                      {canSeeCMC && <TableHead>CMC</TableHead>}
+                    <TableRow className="bg-muted/50 hover:bg-muted/50">
+                      <TableHead className="w-12 text-center">#</TableHead>
+                      <TableHead className="min-w-[180px]">
+                        <div className="flex items-center gap-1">
+                          <span>Student Info</span>
+                        </div>
+                      </TableHead>
+                      <TableHead className="min-w-[100px]">Dept.</TableHead>
+                      <TableHead className="min-w-[150px]">Course</TableHead>
+                      <TableHead className="min-w-[130px]">Violation Type</TableHead>
+                      <TableHead className="min-w-[120px] text-center">Workflow Status</TableHead>
+                      <TableHead className="min-w-[130px] text-center">DAC Decision</TableHead>
+                      {canSeeCMC && <TableHead className="min-w-[130px] text-center">CMC Decision</TableHead>}
                     </TableRow>
                   </TableHeader>
                   <TableBody>
@@ -246,35 +250,39 @@ const Violations = () => {
                         open={expandedRow === v.id}
                         onOpenChange={(open) => setExpandedRow(open ? v.id : null)}
                       >
-                        <TableRow className="cursor-pointer hover:bg-muted/50">
-                          <TableCell>
+                        <TableRow className="group cursor-pointer hover:bg-muted/30 transition-colors">
+                          <TableCell className="text-center">
                             <CollapsibleTrigger asChild>
-                              <Button variant="ghost" size="icon" className="h-8 w-8">
+                              <Button 
+                                variant="ghost" 
+                                size="icon" 
+                                className="h-8 w-8 rounded-full hover:bg-primary/10"
+                              >
                                 {expandedRow === v.id ? (
-                                  <ChevronUp className="h-4 w-4" />
+                                  <ChevronUp className="h-4 w-4 text-primary" />
                                 ) : (
-                                  <ChevronDown className="h-4 w-4" />
+                                  <ChevronDown className="h-4 w-4 text-muted-foreground group-hover:text-primary" />
                                 )}
                               </Button>
                             </CollapsibleTrigger>
                           </TableCell>
                           <TableCell>
-                            <div className="flex items-center gap-2">
-                              <div>
+                            <div className="flex items-center gap-3">
+                              <div className="flex-1 min-w-0">
                                 <ViolationHistoryDialog
                                   studentId={v.students?.id}
                                   studentName={v.students?.full_name}
                                   studentIdNumber={v.students?.student_id}
                                   trigger={
-                                    <button className="text-left hover:underline">
-                                      <p className="font-medium">{v.students?.full_name}</p>
-                                      <p className="text-sm text-muted-foreground">{v.students?.student_id}</p>
+                                    <button className="text-left hover:text-primary transition-colors">
+                                      <p className="font-semibold text-foreground truncate">{v.students?.full_name}</p>
+                                      <p className="text-xs text-muted-foreground font-mono">{v.students?.student_id}</p>
                                     </button>
                                   }
                                 />
                               </div>
                               {v.is_repeat_offender && (
-                                <Badge variant="destructive" className="text-xs">
+                                <Badge variant="destructive" className="shrink-0 text-xs px-2 py-0.5">
                                   <AlertTriangle className="h-3 w-3 mr-1" />
                                   Repeat
                                 </Badge>
@@ -282,30 +290,52 @@ const Violations = () => {
                             </div>
                           </TableCell>
                           <TableCell>
-                            <Badge variant="outline">{v.students?.departments?.code || '—'}</Badge>
-                          </TableCell>
-                          <TableCell>
-                            <div>
-                              <p className="font-medium">{v.course_name}</p>
-                              <p className="text-sm text-muted-foreground">{v.course_code}</p>
-                            </div>
-                          </TableCell>
-                          <TableCell>
-                            <Badge variant="secondary">{v.violation_type}</Badge>
-                          </TableCell>
-                          <TableCell>
-                            <Badge className={cn('border', getWorkflowColor(v.workflow_status))}>
-                              {getWorkflowLabel(v.workflow_status)}
+                            <Badge variant="outline" className="font-medium">
+                              {v.students?.departments?.code || '—'}
                             </Badge>
                           </TableCell>
                           <TableCell>
-                            <Badge className={cn('border', getStatusColor(v.dac_decision))}>
+                            <div className="space-y-0.5">
+                              <p className="font-medium text-foreground line-clamp-1">{v.course_name}</p>
+                              <p className="text-xs text-muted-foreground font-mono">{v.course_code}</p>
+                            </div>
+                          </TableCell>
+                          <TableCell>
+                            <Badge 
+                              variant="secondary" 
+                              className="whitespace-nowrap text-xs font-medium"
+                            >
+                              {v.violation_type}
+                            </Badge>
+                          </TableCell>
+                          <TableCell className="text-center">
+                            <Badge 
+                              className={cn(
+                                'border whitespace-nowrap text-xs font-medium',
+                                getWorkflowColor(v.workflow_status)
+                              )}
+                            >
+                              {getWorkflowLabel(v.workflow_status)}
+                            </Badge>
+                          </TableCell>
+                          <TableCell className="text-center">
+                            <Badge 
+                              className={cn(
+                                'border whitespace-nowrap text-xs font-medium',
+                                getStatusColor(v.dac_decision)
+                              )}
+                            >
                               {v.dac_decision}
                             </Badge>
                           </TableCell>
                           {canSeeCMC && (
-                            <TableCell>
-                              <Badge className={cn('border', getStatusColor(v.cmc_decision))}>
+                            <TableCell className="text-center">
+                              <Badge 
+                                className={cn(
+                                  'border whitespace-nowrap text-xs font-medium',
+                                  getStatusColor(v.cmc_decision)
+                                )}
+                              >
                                 {v.cmc_decision}
                               </Badge>
                             </TableCell>
@@ -313,41 +343,59 @@ const Violations = () => {
                         </TableRow>
                         <CollapsibleContent asChild>
                           <tr>
-                            <td colSpan={canSeeCMC ? 8 : 7} className="bg-muted/30 px-6 py-4">
-                              <div className="space-y-4">
-                                <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
-                                  <div>
-                                    <span className="text-muted-foreground">Date:</span>
-                                    <p className="font-medium">
-                                      {new Date(v.incident_date).toLocaleDateString()}
-                                    </p>
+                            <td colSpan={canSeeCMC ? 8 : 7} className="p-0">
+                              <div className="bg-muted/20 border-y border-border/50 px-8 py-5">
+                                <div className="space-y-4">
+                                  <div className="grid grid-cols-2 md:grid-cols-4 gap-6 text-sm">
+                                    <div className="space-y-1">
+                                      <span className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                                        Incident Date
+                                      </span>
+                                      <p className="font-semibold text-foreground">
+                                        {new Date(v.incident_date).toLocaleDateString('en-US', {
+                                          year: 'numeric',
+                                          month: 'short',
+                                          day: 'numeric'
+                                        })}
+                                      </p>
+                                    </div>
+                                    <div className="space-y-1">
+                                      <span className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                                        Exam Type
+                                      </span>
+                                      <p className="font-semibold text-foreground">{v.exam_type}</p>
+                                    </div>
+                                    <div className="space-y-1">
+                                      <span className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                                        Invigilator
+                                      </span>
+                                      <p className="font-semibold text-foreground">{v.invigilator}</p>
+                                    </div>
+                                    <div className="space-y-1">
+                                      <span className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                                        Program
+                                      </span>
+                                      <p className="font-semibold text-foreground">{v.students?.program}</p>
+                                    </div>
                                   </div>
-                                  <div>
-                                    <span className="text-muted-foreground">Exam Type:</span>
-                                    <p className="font-medium">{v.exam_type}</p>
-                                  </div>
-                                  <div>
-                                    <span className="text-muted-foreground">Invigilator:</span>
-                                    <p className="font-medium">{v.invigilator}</p>
-                                  </div>
-                                  <div>
-                                    <span className="text-muted-foreground">Program:</span>
-                                    <p className="font-medium">{v.students?.program}</p>
-                                  </div>
-                                </div>
-                                
-                                {v.description && (
-                                  <div className="text-sm">
-                                    <span className="text-muted-foreground">Notes:</span>
-                                    <p className="mt-1 whitespace-pre-wrap">{v.description}</p>
-                                  </div>
-                                )}
+                                  
+                                  {v.description && (
+                                    <div className="space-y-1 pt-2 border-t border-border/50">
+                                      <span className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                                        Additional Notes
+                                      </span>
+                                      <p className="text-sm text-foreground whitespace-pre-wrap leading-relaxed">
+                                        {v.description}
+                                      </p>
+                                    </div>
+                                  )}
 
-                                <div className="pt-2 border-t">
-                                  <WorkflowActions
-                                    violation={v}
-                                    onClose={() => setExpandedRow(null)}
-                                  />
+                                  <div className="pt-3 border-t border-border/50">
+                                    <WorkflowActions
+                                      violation={v}
+                                      onClose={() => setExpandedRow(null)}
+                                    />
+                                  </div>
                                 </div>
                               </div>
                             </td>
