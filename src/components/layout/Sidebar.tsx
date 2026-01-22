@@ -9,6 +9,7 @@ import {
   ChevronRight,
   Building2,
   Shield,
+  BarChart3,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
@@ -17,6 +18,7 @@ const navItems = [
   { icon: LayoutDashboard, label: 'Dashboard', path: '/' },
   { icon: FileText, label: 'Violations', path: '/violations' },
   { icon: Users, label: 'Students', path: '/students' },
+  { icon: BarChart3, label: 'Reports', path: '/reports' },
   { icon: Building2, label: 'Organization', path: '/departments' },
   { icon: Shield, label: 'Users & Roles', path: '/users' },
   { icon: Settings, label: 'Settings', path: '/settings' },
