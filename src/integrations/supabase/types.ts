@@ -76,6 +76,7 @@ export type Database = {
       profiles: {
         Row: {
           avatar_url: string | null
+          college_id: string | null
           created_at: string
           department_id: string | null
           email: string | null
@@ -88,6 +89,7 @@ export type Database = {
         }
         Insert: {
           avatar_url?: string | null
+          college_id?: string | null
           created_at?: string
           department_id?: string | null
           email?: string | null
@@ -100,6 +102,7 @@ export type Database = {
         }
         Update: {
           avatar_url?: string | null
+          college_id?: string | null
           created_at?: string
           department_id?: string | null
           email?: string | null
@@ -111,6 +114,13 @@ export type Database = {
           updated_at?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "profiles_college_id_fkey"
+            columns: ["college_id"]
+            isOneToOne: false
+            referencedRelation: "colleges"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "profiles_department_id_fkey"
             columns: ["department_id"]
@@ -160,6 +170,7 @@ export type Database = {
       }
       user_roles: {
         Row: {
+          college_id: string | null
           created_at: string
           department_id: string | null
           id: string
@@ -167,6 +178,7 @@ export type Database = {
           user_id: string
         }
         Insert: {
+          college_id?: string | null
           created_at?: string
           department_id?: string | null
           id?: string
@@ -174,6 +186,7 @@ export type Database = {
           user_id: string
         }
         Update: {
+          college_id?: string | null
           created_at?: string
           department_id?: string | null
           id?: string
@@ -181,6 +194,13 @@ export type Database = {
           user_id?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "user_roles_college_id_fkey"
+            columns: ["college_id"]
+            isOneToOne: false
+            referencedRelation: "colleges"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "user_roles_department_id_fkey"
             columns: ["department_id"]

@@ -84,17 +84,32 @@ export const WorkflowActions = ({ violation, onClose }: WorkflowActionsProps) =>
   const isHead = roles.some(r => r.role === 'department_head');
   const isAVD = roles.some(r => r.role === 'academic_vice_dean');
   
+  // Management/view-only roles
+  const isCollegeDean = roles.some(r => r.role === 'college_dean');
+  const isCollegeRegistrar = roles.some(r => r.role === 'college_registrar');
+  const isMainRegistrar = roles.some(r => r.role === 'main_registrar');
+  const isVPAA = roles.some(r => r.role === 'vpaa');
+  const isManagementRole = isCollegeDean || isCollegeRegistrar || isMainRegistrar || isVPAA;
+  
   // Check if record is locked for department users
   const recordLocked = isRecordLocked(violation);
   const departmentCanEdit = canDepartmentEdit(violation, isSystemAdmin, isAVD);
 
-  // Department users can only take actions if the record is not locked
+  // WORKFLOW PERMISSIONS:
+  // Deputy/Head can submit to Head, Head approves and sets DAC decision
   const canSubmitToHead = departmentCanEdit && (isDeputy || isHead) && violation.workflow_status === 'draft';
   const canApproveAsHead = departmentCanEdit && isHead && violation.workflow_status === 'submitted_to_head';
   const canSubmitToAVD = departmentCanEdit && isHead && violation.workflow_status === 'approved_by_head';
+  
+  // AVD approves and sets both DAC (if not set) and CMC decision
   const canApproveAsAVD = isAVD && violation.workflow_status === 'submitted_to_avd';
-  const canSetCMCDecision = (isAVD || isSystemAdmin) && 
+  
+  // CMC decision is ONLY by AVD (final decision maker)
+  const canSetCMCDecision = isAVD && 
     (violation.workflow_status === 'approved_by_avd' || violation.workflow_status === 'pending_cmc');
+  
+  // System admin can override but shouldn't normally make workflow decisions
+  // Management roles are view-only
 
   const handleWorkflowAction = async (newStatus: string, additionalData: Record<string, any> = {}) => {
     setIsSubmitting(true);
@@ -173,8 +188,9 @@ export const WorkflowActions = ({ violation, onClose }: WorkflowActionsProps) =>
     setShowDecisionDialog(true);
   };
 
-  // Show locked message for department users
+  // Show locked message for department users or management view-only message
   const showLockedMessage = recordLocked && !isSystemAdmin && !isAVD && (isDeputy || isHead);
+  const showViewOnlyMessage = isManagementRole && !isAVD;
 
   return (
     <>
@@ -183,6 +199,12 @@ export const WorkflowActions = ({ violation, onClose }: WorkflowActionsProps) =>
           <Badge variant="secondary" className="text-xs bg-muted">
             <Lock className="h-3 w-3 mr-1" />
             Record locked after CMC decision
+          </Badge>
+        )}
+        
+        {showViewOnlyMessage && (
+          <Badge variant="outline" className="text-xs">
+            View Only - Management Role
           </Badge>
         )}
         
@@ -241,26 +263,26 @@ export const WorkflowActions = ({ violation, onClose }: WorkflowActionsProps) =>
         {canApproveAsAVD && (
           <Button
             size="sm"
-            onClick={() => handleWorkflowAction('approved_by_avd', {
+            onClick={() => handleWorkflowAction('pending_cmc', {
               approved_by_avd: user?.id,
               avd_approved_at: new Date().toISOString(),
-              workflow_status: 'pending_cmc',
             })}
             disabled={isSubmitting}
           >
             <CheckCircle className="h-4 w-4 mr-1" />
-            Approve for CMC
+            Approve & Ready for CMC Decision
           </Button>
         )}
 
         {canSetCMCDecision && (
           <Button
             size="sm"
+            variant="default"
             onClick={() => openDecisionDialog('cmc')}
             disabled={isSubmitting}
           >
             <CheckCircle className="h-4 w-4 mr-1" />
-            Set CMC Decision
+            Set CMC Decision (Final)
           </Button>
         )}
       </div>

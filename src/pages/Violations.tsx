@@ -93,9 +93,17 @@ const Violations = () => {
   const [expandedRow, setExpandedRow] = useState<string | null>(null);
   const { isSystemAdmin, roles } = useAuth();
   
-  const isHead = roles.some(r => r.role === 'department_head' || r.role === 'deputy_department_head');
+  // Only department head or deputy from the same department can create violations
+  // System admin cannot create violations - they are management/view-only at this level
+  const isHead = roles.some(r => r.role === 'department_head');
+  const isDeputy = roles.some(r => r.role === 'deputy_department_head');
   const isAVD = roles.some(r => r.role === 'academic_vice_dean');
-  const canAddViolation = isSystemAdmin || isHead || isAVD;
+  const userDepartmentId = roles.find(r => r.department_id)?.department_id;
+  
+  // Only department head or deputy can ADD violations (not AVD, not system admin)
+  const canAddViolation = (isHead || isDeputy) && userDepartmentId;
+  
+  // CMC decisions only visible to AVD and system admin
   const canSeeCMC = isSystemAdmin || isAVD;
 
   const { data: departments } = useQuery({

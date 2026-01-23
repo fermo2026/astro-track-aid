@@ -24,6 +24,7 @@ import {
 import { toast } from 'sonner';
 import { Plus, Loader2 } from 'lucide-react';
 import { z } from 'zod';
+import { useAuth } from '@/contexts/AuthContext';
 
 const violationTypes = [
   'Cheating with Notes',
@@ -71,6 +72,7 @@ interface ViolationDialogProps {
 }
 
 export const ViolationDialog = ({ onSuccess }: ViolationDialogProps) => {
+  const { roles } = useAuth();
   const [open, setOpen] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [studentSearch, setStudentSearch] = useState('');
@@ -87,21 +89,31 @@ export const ViolationDialog = ({ onSuccess }: ViolationDialogProps) => {
     description: '',
   });
   const queryClient = useQueryClient();
+  
+  // Get user's department from their role
+  const userDepartmentId = roles.find(r => r.department_id)?.department_id;
 
+  // Only fetch students from the user's department
   const { data: students, isLoading: studentsLoading } = useQuery({
-    queryKey: ['students-search', studentSearch],
+    queryKey: ['students-search', studentSearch, userDepartmentId],
     queryFn: async () => {
-      const { data, error } = await supabase
+      let query = supabase
         .from('students')
         .select('id, student_id, full_name, departments(name)')
         .or(`full_name.ilike.%${studentSearch}%,student_id.ilike.%${studentSearch}%`)
         .order('full_name')
         .limit(10);
+      
+      // Filter to user's department only
+      if (userDepartmentId) {
+        query = query.eq('department_id', userDepartmentId);
+      }
 
+      const { data, error } = await query;
       if (error) throw error;
       return data;
     },
-    enabled: open && studentSearch.length >= 2,
+    enabled: open && studentSearch.length >= 2 && !!userDepartmentId,
   });
 
   const handleSubmit = async (e: React.FormEvent) => {
