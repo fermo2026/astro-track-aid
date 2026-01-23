@@ -101,12 +101,14 @@ export const WorkflowActions = ({ violation, onClose }: WorkflowActionsProps) =>
   const canApproveAsHead = departmentCanEdit && isHead && violation.workflow_status === 'submitted_to_head';
   const canSubmitToAVD = departmentCanEdit && isHead && violation.workflow_status === 'approved_by_head';
   
-  // AVD approves and sets both DAC (if not set) and CMC decision
-  const canApproveAsAVD = isAVD && violation.workflow_status === 'submitted_to_avd';
+  // AVD approves when status is submitted_to_avd OR approved_by_head (direct visibility)
+  const canApproveAsAVD = isAVD && 
+    (violation.workflow_status === 'submitted_to_avd' || violation.workflow_status === 'approved_by_head');
   
-  // CMC decision is ONLY by AVD (final decision maker)
+  // CMC decision is ONLY by AVD (final decision maker) - can set after approving
   const canSetCMCDecision = isAVD && 
-    (violation.workflow_status === 'approved_by_avd' || violation.workflow_status === 'pending_cmc');
+    (violation.workflow_status === 'approved_by_avd' || violation.workflow_status === 'pending_cmc' || 
+     violation.workflow_status === 'submitted_to_avd' || violation.workflow_status === 'approved_by_head');
   
   // System admin can override but shouldn't normally make workflow decisions
   // Management roles are view-only
