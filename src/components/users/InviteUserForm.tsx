@@ -46,6 +46,7 @@ export const InviteUserForm = ({ onSuccess }: InviteUserFormProps) => {
   const [fullName, setFullName] = useState('');
   const [role, setRole] = useState('');
   const [departmentId, setDepartmentId] = useState('');
+  const [collegeId, setCollegeId] = useState('');
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
   const [isLoading, setIsLoading] = useState(false);
@@ -56,6 +57,19 @@ export const InviteUserForm = ({ onSuccess }: InviteUserFormProps) => {
     queryFn: async () => {
       const { data, error } = await supabase
         .from('departments')
+        .select('id, name, code')
+        .order('name');
+      
+      if (error) throw error;
+      return data;
+    },
+  });
+
+  const { data: colleges } = useQuery({
+    queryKey: ['colleges'],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('colleges')
         .select('id, name, code')
         .order('name');
       
@@ -76,7 +90,8 @@ export const InviteUserForm = ({ onSuccess }: InviteUserFormProps) => {
           email,
           full_name: fullName,
           role,
-          department_id: departmentId || null,
+          department_id: needsDepartment ? (departmentId || null) : null,
+          college_id: needsCollege ? (collegeId || null) : null,
         },
       });
 
@@ -96,6 +111,7 @@ export const InviteUserForm = ({ onSuccess }: InviteUserFormProps) => {
       setFullName('');
       setRole('');
       setDepartmentId('');
+      setCollegeId('');
       
       onSuccess?.();
       
@@ -113,7 +129,11 @@ export const InviteUserForm = ({ onSuccess }: InviteUserFormProps) => {
     }
   };
 
-  const needsDepartment = ['deputy_department_head', 'department_head', 'academic_vice_dean', 'college_dean', 'college_registrar'].includes(role);
+  // Department-level roles need department
+  const needsDepartment = ['deputy_department_head', 'department_head'].includes(role);
+  // College-level roles need college (AVD, Dean, Registrar)
+  const needsCollege = ['academic_vice_dean', 'college_dean', 'college_registrar'].includes(role);
+  // Management roles: main_registrar, vpaa, system_admin - no department/college needed
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
@@ -189,7 +209,7 @@ export const InviteUserForm = ({ onSuccess }: InviteUserFormProps) => {
 
             {needsDepartment && (
               <div className="space-y-2">
-                <Label htmlFor="department">Department</Label>
+                <Label htmlFor="department">Department *</Label>
                 <Select value={departmentId} onValueChange={setDepartmentId} disabled={isLoading}>
                   <SelectTrigger>
                     <SelectValue placeholder="Select a department" />
@@ -202,6 +222,27 @@ export const InviteUserForm = ({ onSuccess }: InviteUserFormProps) => {
                     ))}
                   </SelectContent>
                 </Select>
+              </div>
+            )}
+
+            {needsCollege && (
+              <div className="space-y-2">
+                <Label htmlFor="college">College *</Label>
+                <Select value={collegeId} onValueChange={setCollegeId} disabled={isLoading}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select a college" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {colleges?.map((college) => (
+                      <SelectItem key={college.id} value={college.id}>
+                        {college.name} ({college.code})
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <p className="text-xs text-muted-foreground">
+                  This role has access to all departments within the selected college.
+                </p>
               </div>
             )}
 
