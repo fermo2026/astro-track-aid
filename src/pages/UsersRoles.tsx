@@ -151,7 +151,6 @@ const UsersRoles = () => {
                     <TableRow>
                       <TableHead>Name</TableHead>
                       <TableHead>Email</TableHead>
-                      <TableHead>Role(s)</TableHead>
                       <TableHead>Status</TableHead>
                       <TableHead className="text-right">Actions</TableHead>
                     </TableRow>
@@ -163,18 +162,6 @@ const UsersRoles = () => {
                           {usr.full_name || 'N/A'}
                         </TableCell>
                         <TableCell>{usr.email}</TableCell>
-                        <TableCell>
-                          <div className="flex flex-wrap gap-1">
-                            {usr.roles.map((r: any, idx: number) => (
-                              <Badge key={idx} variant="secondary">
-                                {getRoleLabel(r.role)}
-                              </Badge>
-                            ))}
-                            {usr.roles.length === 0 && (
-                              <span className="text-muted-foreground text-sm">No role</span>
-                            )}
-                          </div>
-                        </TableCell>
                         <TableCell>
                           {usr.must_change_password ? (
                             <Badge variant="outline" className="text-warning border-warning">
