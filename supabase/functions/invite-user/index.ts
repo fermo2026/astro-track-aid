@@ -11,6 +11,7 @@ interface InviteUserRequest {
   full_name: string;
   role: string;
   department_id?: string;
+  college_id?: string;
 }
 
 const DEFAULT_PASSWORD = "12345678";
@@ -69,7 +70,7 @@ serve(async (req: Request): Promise<Response> => {
       );
     }
 
-    const { email, full_name, role, department_id }: InviteUserRequest = await req.json();
+    const { email, full_name, role, department_id, college_id }: InviteUserRequest = await req.json();
 
     if (!email || !full_name || !role) {
       return new Response(
@@ -105,6 +106,7 @@ serve(async (req: Request): Promise<Response> => {
         invited_by: invitingUser.id,
         invited_at: new Date().toISOString(),
         department_id: department_id || null,
+        college_id: college_id || null,
       })
       .eq("id", newUser.user.id);
 
@@ -119,6 +121,7 @@ serve(async (req: Request): Promise<Response> => {
         user_id: newUser.user.id,
         role,
         department_id: department_id || null,
+        college_id: college_id || null,
       });
 
     if (roleInsertError) {
