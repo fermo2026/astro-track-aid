@@ -6,6 +6,7 @@ import { TrendChart } from '@/components/dashboard/TrendChart';
 import { ViolationTypeChart } from '@/components/dashboard/ViolationTypeChart';
 import { ExamTypeChart } from '@/components/dashboard/ExamTypeChart';
 import { RecentViolations } from '@/components/dashboard/RecentViolations';
+import { PendingActionsWidget } from '@/components/dashboard/PendingActionsWidget';
 import { ExportButton } from '@/components/export/ExportButton';
 import { useDashboardStats } from '@/hooks/useDashboardStats';
 
@@ -52,6 +53,9 @@ const Dashboard = () => {
             icon={TrendingUp}
           />
         </div>
+
+        {/* Pending Actions Widget */}
+        <PendingActionsWidget />
 
         {/* Charts Grid */}
         <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
