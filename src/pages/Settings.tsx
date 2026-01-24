@@ -4,9 +4,13 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
-import { Settings as SettingsIcon, Bell, Shield, Database } from 'lucide-react';
+import { Bell, Shield, Database } from 'lucide-react';
+import { useAuth } from '@/contexts/AuthContext';
+import { AcademicYearSettings } from '@/components/settings/AcademicYearSettings';
 
 const Settings = () => {
+  const { isSystemAdmin } = useAuth();
+
   return (
     <MainLayout>
       <div className="space-y-6 animate-fade-in">
@@ -17,7 +21,10 @@ const Settings = () => {
           </p>
         </div>
 
-        <div className="grid gap-6 max-w-3xl">
+        <div className="grid gap-6 max-w-4xl">
+          {/* Academic Year Settings - System Admin Only */}
+          {isSystemAdmin && <AcademicYearSettings />}
+
           {/* Notification Settings */}
           <Card>
             <CardHeader>
@@ -95,10 +102,6 @@ const Settings = () => {
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
-              <div className="space-y-2">
-                <Label>Academic Year</Label>
-                <Input placeholder="2023/2024" defaultValue="2023/2024" />
-              </div>
               <div className="space-y-2">
                 <Label>Institution Name</Label>
                 <Input placeholder="Institution name" defaultValue="Adama Science and Technology University" />
