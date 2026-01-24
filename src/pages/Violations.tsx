@@ -5,6 +5,7 @@ import { MainLayout } from '@/components/layout/MainLayout';
 import { ViolationDialog } from '@/components/violations/ViolationDialog';
 import { ViolationHistoryDialog } from '@/components/violations/ViolationHistoryDialog';
 import { QuickApprovalActions } from '@/components/violations/QuickApprovalActions';
+import { PrintableViolationReport } from '@/components/violations/PrintableViolationReport';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent } from '@/components/ui/card';
@@ -153,6 +154,11 @@ const ViolationDetailDialog = ({ violation, trigger }: { violation: any; trigger
               <p className="text-sm whitespace-pre-wrap">{violation.description}</p>
             </div>
           )}
+
+          {/* Print Button */}
+          <div className="border-t pt-4 flex justify-end">
+            <PrintableViolationReport violation={violation} />
+          </div>
         </div>
       </DialogContent>
     </Dialog>
