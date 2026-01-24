@@ -3,7 +3,6 @@ import { Trash2, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
   AlertDialog,
-  AlertDialogAction,
   AlertDialogCancel,
   AlertDialogContent,
   AlertDialogDescription,
@@ -80,7 +79,7 @@ export const StudentDeleteDialog = ({ student }: StudentDeleteDialogProps) => {
         </AlertDialogHeader>
         <AlertDialogFooter>
           <AlertDialogCancel disabled={isDeleting}>Cancel</AlertDialogCancel>
-          <AlertDialogAction
+          <Button
             onClick={handleDelete}
             disabled={isDeleting}
             className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
@@ -93,7 +92,7 @@ export const StudentDeleteDialog = ({ student }: StudentDeleteDialogProps) => {
             ) : (
               'Delete'
             )}
-          </AlertDialogAction>
+          </Button>
         </AlertDialogFooter>
       </AlertDialogContent>
     </AlertDialog>

@@ -1,9 +1,11 @@
 import { useState } from 'react';
-import { useQueryClient } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { Badge } from '@/components/ui/badge';
+import { ScrollArea } from '@/components/ui/scroll-area';
 import {
   Dialog,
   DialogContent,
@@ -14,17 +16,26 @@ import {
   DialogTrigger,
 } from '@/components/ui/dialog';
 import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select';
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from '@/components/ui/table';
 import { toast } from 'sonner';
-import { Upload, Loader2, Download, FileSpreadsheet } from 'lucide-react';
-import { Alert, AlertDescription } from '@/components/ui/alert';
+import { Upload, Loader2, Download, FileSpreadsheet, AlertTriangle, CheckCircle, XCircle, ArrowLeft, Eye } from 'lucide-react';
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 
 type ImportType = 'students' | 'departments' | 'colleges';
+
+interface ValidationResult {
+  row: number;
+  data: Record<string, string>;
+  status: 'valid' | 'duplicate' | 'error' | 'warning';
+  message?: string;
+}
 
 const TEMPLATES: Record<ImportType, { headers: string[]; example: string[][] }> = {
   students: {
@@ -95,9 +106,33 @@ export const ImportDialog = ({ type, onSuccess }: ImportDialogProps) => {
   const [open, setOpen] = useState(false);
   const [file, setFile] = useState<File | null>(null);
   const [isLoading, setIsLoading] = useState(false);
+  const [isValidating, setIsValidating] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [importedCount, setImportedCount] = useState(0);
+  const [step, setStep] = useState<'upload' | 'review'>('upload');
+  const [validationResults, setValidationResults] = useState<ValidationResult[]>([]);
+  const [parsedHeaders, setParsedHeaders] = useState<string[]>([]);
   const queryClient = useQueryClient();
+
+  // Fetch existing data for duplicate detection
+  const { data: existingStudents } = useQuery({
+    queryKey: ['existing-students-for-import'],
+    queryFn: async () => {
+      const { data, error } = await supabase.from('students').select('student_id');
+      if (error) throw error;
+      return new Set(data.map(s => s.student_id.toLowerCase()));
+    },
+    enabled: type === 'students' && open,
+  });
+
+  const { data: departments } = useQuery({
+    queryKey: ['departments-for-import'],
+    queryFn: async () => {
+      const { data, error } = await supabase.from('departments').select('id, code');
+      if (error) throw error;
+      return data;
+    },
+    enabled: type === 'students' && open,
+  });
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const selectedFile = e.target.files?.[0];
@@ -108,6 +143,142 @@ export const ImportDialog = ({ type, onSuccess }: ImportDialogProps) => {
       }
       setFile(selectedFile);
       setError(null);
+      setValidationResults([]);
+      setStep('upload');
+    }
+  };
+
+  const validateStudents = async (rows: string[][], headers: string[]): Promise<ValidationResult[]> => {
+    const studentIdIdx = headers.indexOf('student_id');
+    const fullNameIdx = headers.indexOf('full_name');
+    const deptCodeIdx = headers.indexOf('department_code');
+    const programIdx = headers.indexOf('program');
+
+    const deptMap = new Map(departments?.map((d) => [d.code.toLowerCase(), d.id]) || []);
+    const validPrograms = ['BSc', 'MSc', 'PhD'];
+    const seenIds = new Set<string>();
+    const results: ValidationResult[] = [];
+
+    for (let i = 0; i < rows.length; i++) {
+      const row = rows[i];
+      const studentId = row[studentIdIdx]?.trim();
+      const fullName = row[fullNameIdx]?.trim();
+      const deptCode = row[deptCodeIdx]?.trim();
+      const program = row[programIdx]?.trim();
+
+      const data = { student_id: studentId, full_name: fullName, department_code: deptCode, program };
+
+      // Check required fields
+      if (!studentId || !fullName) {
+        results.push({
+          row: i + 2,
+          data,
+          status: 'error',
+          message: 'Student ID and Full Name are required',
+        });
+        continue;
+      }
+
+      // Check for duplicates within file
+      if (seenIds.has(studentId.toLowerCase())) {
+        results.push({
+          row: i + 2,
+          data,
+          status: 'error',
+          message: 'Duplicate student ID in file',
+        });
+        continue;
+      }
+      seenIds.add(studentId.toLowerCase());
+
+      // Check for existing in database
+      if (existingStudents?.has(studentId.toLowerCase())) {
+        results.push({
+          row: i + 2,
+          data,
+          status: 'duplicate',
+          message: 'Student already exists (will be updated)',
+        });
+        continue;
+      }
+
+      // Check department
+      if (deptCode && !deptMap.has(deptCode.toLowerCase())) {
+        results.push({
+          row: i + 2,
+          data,
+          status: 'warning',
+          message: `Department "${deptCode}" not found`,
+        });
+        continue;
+      }
+
+      // Check program
+      if (program && !validPrograms.includes(program)) {
+        results.push({
+          row: i + 2,
+          data,
+          status: 'warning',
+          message: `Invalid program "${program}". Use BSc, MSc, or PhD`,
+        });
+        continue;
+      }
+
+      results.push({
+        row: i + 2,
+        data,
+        status: 'valid',
+      });
+    }
+
+    return results;
+  };
+
+  const handleValidate = async () => {
+    if (!file) {
+      setError('Please select a file');
+      return;
+    }
+
+    setIsValidating(true);
+    setError(null);
+
+    try {
+      const text = await file.text();
+      const allRows = parseCSV(text);
+      const headers = allRows[0].map((h) => h.toLowerCase().trim());
+      const dataRows = allRows.slice(1);
+
+      setParsedHeaders(headers);
+
+      // Check required headers
+      const requiredHeaders = TEMPLATES[type].headers;
+      const missingHeaders = requiredHeaders.filter(h => !headers.includes(h));
+      
+      if (missingHeaders.length > 0) {
+        setError(`Missing required columns: ${missingHeaders.join(', ')}`);
+        setIsValidating(false);
+        return;
+      }
+
+      let results: ValidationResult[] = [];
+      if (type === 'students') {
+        results = await validateStudents(dataRows, headers);
+      } else {
+        // For departments/colleges, simple validation
+        results = dataRows.map((row, i) => ({
+          row: i + 2,
+          data: Object.fromEntries(headers.map((h, idx) => [h, row[idx] || ''])),
+          status: 'valid' as const,
+        }));
+      }
+
+      setValidationResults(results);
+      setStep('review');
+    } catch (err: any) {
+      setError(err.message || 'Failed to validate file');
+    } finally {
+      setIsValidating(false);
     }
   };
 
@@ -117,19 +288,22 @@ export const ImportDialog = ({ type, onSuccess }: ImportDialogProps) => {
     const deptCodeIdx = headers.indexOf('department_code');
     const programIdx = headers.indexOf('program');
 
-    // Get departments for lookup
-    const { data: departments } = await supabase
-      .from('departments')
-      .select('id, code');
-
     const deptMap = new Map(departments?.map((d) => [d.code.toLowerCase(), d.id]) || []);
 
-    const students = rows.map((row) => ({
-      student_id: row[studentIdIdx],
-      full_name: row[fullNameIdx],
-      department_id: deptMap.get(row[deptCodeIdx]?.toLowerCase()) || null,
-      program: row[programIdx] as 'BSc' | 'MSc' | 'PhD',
-    }));
+    // Only process valid and duplicate (update) rows
+    const validRows = validationResults
+      .filter(r => r.status === 'valid' || r.status === 'duplicate')
+      .map(r => r.row - 2);
+
+    const students = validRows.map((rowIdx) => {
+      const row = rows[rowIdx];
+      return {
+        student_id: row[studentIdIdx]?.trim(),
+        full_name: row[fullNameIdx]?.trim(),
+        department_id: deptMap.get(row[deptCodeIdx]?.toLowerCase().trim()) || null,
+        program: (row[programIdx]?.trim() || 'BSc') as 'BSc' | 'MSc' | 'PhD',
+      };
+    });
 
     const { error } = await supabase.from('students').upsert(students, {
       onConflict: 'student_id',
@@ -144,23 +318,21 @@ export const ImportDialog = ({ type, onSuccess }: ImportDialogProps) => {
     const nameIdx = headers.indexOf('name');
     const collegeCodeIdx = headers.indexOf('college_code');
 
-    // Get colleges for lookup
     const { data: colleges } = await supabase.from('colleges').select('id, code');
-
     const collegeMap = new Map(colleges?.map((c) => [c.code.toLowerCase(), c.id]) || []);
 
-    const departments = rows.map((row) => ({
+    const depts = rows.map((row) => ({
       code: row[codeIdx],
       name: row[nameIdx],
       college_id: collegeMap.get(row[collegeCodeIdx]?.toLowerCase()) || null,
     }));
 
-    const { error } = await supabase.from('departments').upsert(departments, {
+    const { error } = await supabase.from('departments').upsert(depts, {
       onConflict: 'code',
     });
 
     if (error) throw error;
-    return departments.length;
+    return depts.length;
   };
 
   const processColleges = async (rows: string[][], headers: string[]) => {
@@ -181,10 +353,7 @@ export const ImportDialog = ({ type, onSuccess }: ImportDialogProps) => {
   };
 
   const handleImport = async () => {
-    if (!file) {
-      setError('Please select a file');
-      return;
-    }
+    if (!file) return;
 
     setIsLoading(true);
     setError(null);
@@ -208,17 +377,15 @@ export const ImportDialog = ({ type, onSuccess }: ImportDialogProps) => {
           break;
       }
 
-      setImportedCount(count);
       toast.success(`Successfully imported ${count} ${type}`);
       queryClient.invalidateQueries({ queryKey: [type] });
       queryClient.invalidateQueries({ queryKey: ['dashboard-stats'] });
+      queryClient.invalidateQueries({ queryKey: ['existing-students-for-import'] });
       onSuccess?.();
 
       setTimeout(() => {
-        setOpen(false);
-        setFile(null);
-        setImportedCount(0);
-      }, 2000);
+        resetDialog();
+      }, 1000);
     } catch (err: any) {
       console.error('Import error:', err);
       setError(err.message || 'Failed to import data');
@@ -227,78 +394,225 @@ export const ImportDialog = ({ type, onSuccess }: ImportDialogProps) => {
     }
   };
 
+  const resetDialog = () => {
+    setOpen(false);
+    setFile(null);
+    setStep('upload');
+    setValidationResults([]);
+    setError(null);
+  };
+
   const typeLabel = type.charAt(0).toUpperCase() + type.slice(1);
+  
+  const validCount = validationResults.filter(r => r.status === 'valid').length;
+  const duplicateCount = validationResults.filter(r => r.status === 'duplicate').length;
+  const warningCount = validationResults.filter(r => r.status === 'warning').length;
+  const errorCount = validationResults.filter(r => r.status === 'error').length;
+  const canImport = (validCount + duplicateCount) > 0 && errorCount === 0;
 
   return (
-    <Dialog open={open} onOpenChange={setOpen}>
+    <Dialog open={open} onOpenChange={(o) => { if (!o) resetDialog(); else setOpen(o); }}>
       <DialogTrigger asChild>
         <Button variant="outline">
           <Upload className="h-4 w-4 mr-2" />
           Import {typeLabel}
         </Button>
       </DialogTrigger>
-      <DialogContent className="sm:max-w-md">
+      <DialogContent className={step === 'review' ? 'max-w-4xl' : 'sm:max-w-md'}>
         <DialogHeader>
-          <DialogTitle>Import {typeLabel}</DialogTitle>
+          <DialogTitle>
+            {step === 'upload' ? `Import ${typeLabel}` : `Review Import - ${typeLabel}`}
+          </DialogTitle>
           <DialogDescription>
-            Upload a CSV file to import {type}. Download the template first to see the required format.
+            {step === 'upload' 
+              ? `Upload a CSV file to import ${type}. Download the template first to see the required format.`
+              : 'Review the validation results before importing.'}
           </DialogDescription>
         </DialogHeader>
 
-        <div className="space-y-4">
-          <Button
-            variant="outline"
-            className="w-full"
-            onClick={() => downloadTemplate(type)}
-          >
-            <Download className="h-4 w-4 mr-2" />
-            Download Template
-          </Button>
+        {step === 'upload' ? (
+          <div className="space-y-4">
+            <Button
+              variant="outline"
+              className="w-full"
+              onClick={() => downloadTemplate(type)}
+            >
+              <Download className="h-4 w-4 mr-2" />
+              Download Template
+            </Button>
 
-          <div className="space-y-2">
-            <Label htmlFor="file">CSV File</Label>
-            <div className="flex items-center gap-2">
-              <Input
-                id="file"
-                type="file"
-                accept=".csv"
-                onChange={handleFileChange}
-                className="flex-1"
-              />
+            <div className="space-y-2">
+              <Label htmlFor="file">CSV File</Label>
+              <div className="flex items-center gap-2">
+                <Input
+                  id="file"
+                  type="file"
+                  accept=".csv"
+                  onChange={handleFileChange}
+                  className="flex-1"
+                />
+              </div>
+              {file && (
+                <p className="text-sm text-muted-foreground flex items-center gap-2">
+                  <FileSpreadsheet className="h-4 w-4" />
+                  {file.name}
+                </p>
+              )}
             </div>
-            {file && (
-              <p className="text-sm text-muted-foreground flex items-center gap-2">
-                <FileSpreadsheet className="h-4 w-4" />
-                {file.name}
-              </p>
+
+            {error && (
+              <Alert variant="destructive">
+                <AlertTriangle className="h-4 w-4" />
+                <AlertDescription>{error}</AlertDescription>
+              </Alert>
             )}
           </div>
+        ) : (
+          <div className="space-y-4">
+            {/* Summary */}
+            <div className="flex flex-wrap gap-2">
+              <Badge variant="outline" className="bg-green-500/10 text-green-600 border-green-500/20">
+                <CheckCircle className="h-3 w-3 mr-1" />
+                {validCount} Valid
+              </Badge>
+              <Badge variant="outline" className="bg-blue-500/10 text-blue-600 border-blue-500/20">
+                {duplicateCount} Updates
+              </Badge>
+              {warningCount > 0 && (
+                <Badge variant="outline" className="bg-yellow-500/10 text-yellow-600 border-yellow-500/20">
+                  <AlertTriangle className="h-3 w-3 mr-1" />
+                  {warningCount} Warnings
+                </Badge>
+              )}
+              {errorCount > 0 && (
+                <Badge variant="destructive">
+                  <XCircle className="h-3 w-3 mr-1" />
+                  {errorCount} Errors
+                </Badge>
+              )}
+            </div>
 
-          {error && (
-            <Alert variant="destructive">
-              <AlertDescription>{error}</AlertDescription>
-            </Alert>
-          )}
+            {errorCount > 0 && (
+              <Alert variant="destructive">
+                <AlertTriangle className="h-4 w-4" />
+                <AlertTitle>Cannot Import</AlertTitle>
+                <AlertDescription>
+                  Please fix the {errorCount} error(s) before importing.
+                </AlertDescription>
+              </Alert>
+            )}
 
-          {importedCount > 0 && (
-            <Alert>
-              <AlertDescription>
-                Successfully imported {importedCount} records!
-              </AlertDescription>
-            </Alert>
-          )}
-        </div>
+            {/* Results Table */}
+            <Tabs defaultValue="all" className="w-full">
+              <TabsList className="grid w-full grid-cols-4">
+                <TabsTrigger value="all">All ({validationResults.length})</TabsTrigger>
+                <TabsTrigger value="valid">Valid ({validCount})</TabsTrigger>
+                <TabsTrigger value="issues">Issues ({warningCount + errorCount})</TabsTrigger>
+                <TabsTrigger value="duplicates">Updates ({duplicateCount})</TabsTrigger>
+              </TabsList>
+              
+              <TabsContent value="all" className="mt-4">
+                <ValidationTable results={validationResults} />
+              </TabsContent>
+              <TabsContent value="valid" className="mt-4">
+                <ValidationTable results={validationResults.filter(r => r.status === 'valid')} />
+              </TabsContent>
+              <TabsContent value="issues" className="mt-4">
+                <ValidationTable results={validationResults.filter(r => r.status === 'error' || r.status === 'warning')} />
+              </TabsContent>
+              <TabsContent value="duplicates" className="mt-4">
+                <ValidationTable results={validationResults.filter(r => r.status === 'duplicate')} />
+              </TabsContent>
+            </Tabs>
+
+            {error && (
+              <Alert variant="destructive">
+                <AlertTriangle className="h-4 w-4" />
+                <AlertDescription>{error}</AlertDescription>
+              </Alert>
+            )}
+          </div>
+        )}
 
         <DialogFooter>
-          <Button variant="outline" onClick={() => setOpen(false)}>
+          {step === 'review' && (
+            <Button variant="outline" onClick={() => setStep('upload')} className="mr-auto">
+              <ArrowLeft className="h-4 w-4 mr-2" />
+              Back
+            </Button>
+          )}
+          <Button variant="outline" onClick={resetDialog}>
             Cancel
           </Button>
-          <Button onClick={handleImport} disabled={!file || isLoading}>
-            {isLoading && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
-            Import
-          </Button>
+          {step === 'upload' ? (
+            <Button onClick={handleValidate} disabled={!file || isValidating}>
+              {isValidating && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+              <Eye className="h-4 w-4 mr-2" />
+              Validate & Review
+            </Button>
+          ) : (
+            <Button onClick={handleImport} disabled={!canImport || isLoading}>
+              {isLoading && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+              Import {validCount + duplicateCount} Records
+            </Button>
+          )}
         </DialogFooter>
       </DialogContent>
     </Dialog>
+  );
+};
+
+// Validation results table component
+const ValidationTable = ({ results }: { results: ValidationResult[] }) => {
+  if (results.length === 0) {
+    return (
+      <div className="text-center py-8 text-muted-foreground">
+        No records to display
+      </div>
+    );
+  }
+
+  const getStatusBadge = (status: ValidationResult['status']) => {
+    switch (status) {
+      case 'valid':
+        return <Badge variant="outline" className="bg-green-500/10 text-green-600 text-xs">Valid</Badge>;
+      case 'duplicate':
+        return <Badge variant="outline" className="bg-blue-500/10 text-blue-600 text-xs">Update</Badge>;
+      case 'warning':
+        return <Badge variant="outline" className="bg-yellow-500/10 text-yellow-600 text-xs">Warning</Badge>;
+      case 'error':
+        return <Badge variant="destructive" className="text-xs">Error</Badge>;
+    }
+  };
+
+  return (
+    <ScrollArea className="h-[300px] rounded-md border">
+      <Table>
+        <TableHeader>
+          <TableRow>
+            <TableHead className="w-16">Row</TableHead>
+            <TableHead className="w-20">Status</TableHead>
+            <TableHead>Student ID</TableHead>
+            <TableHead>Full Name</TableHead>
+            <TableHead>Dept</TableHead>
+            <TableHead>Program</TableHead>
+            <TableHead>Message</TableHead>
+          </TableRow>
+        </TableHeader>
+        <TableBody>
+          {results.map((result) => (
+            <TableRow key={result.row} className={result.status === 'error' ? 'bg-destructive/5' : ''}>
+              <TableCell className="font-mono text-xs">{result.row}</TableCell>
+              <TableCell>{getStatusBadge(result.status)}</TableCell>
+              <TableCell className="font-mono text-xs">{result.data.student_id}</TableCell>
+              <TableCell className="text-sm">{result.data.full_name}</TableCell>
+              <TableCell className="text-xs">{result.data.department_code || '—'}</TableCell>
+              <TableCell className="text-xs">{result.data.program || '—'}</TableCell>
+              <TableCell className="text-xs text-muted-foreground">{result.message || '—'}</TableCell>
+            </TableRow>
+          ))}
+        </TableBody>
+      </Table>
+    </ScrollArea>
   );
 };
