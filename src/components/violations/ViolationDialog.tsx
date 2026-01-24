@@ -1,10 +1,12 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
+import { Badge } from '@/components/ui/badge';
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import {
   Dialog,
   DialogContent,
@@ -22,10 +24,11 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { toast } from 'sonner';
-import { Plus, Loader2 } from 'lucide-react';
+import { Plus, Loader2, AlertTriangle, Star } from 'lucide-react';
 import { z } from 'zod';
 import { useAuth } from '@/contexts/AuthContext';
 import { violationTypes, dacDecisionOptions } from '@/constants/violationOptions';
+import { checkRepeatOffender, getRiskLevelColor, type RepeatOffenderInfo } from '@/utils/repeatOffenderDetection';
 
 const formSchema = z.object({
   student_id: z.string().min(1, 'Student is required'),
@@ -50,6 +53,8 @@ export const ViolationDialog = ({ onSuccess }: ViolationDialogProps) => {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [studentSearch, setStudentSearch] = useState('');
   const [selectedStudent, setSelectedStudent] = useState<string | null>(null);
+  const [repeatOffenderInfo, setRepeatOffenderInfo] = useState<RepeatOffenderInfo | null>(null);
+  const [isCheckingRepeat, setIsCheckingRepeat] = useState(false);
   const [formData, setFormData] = useState({
     exam_type: '',
     incident_date: '',
@@ -65,6 +70,41 @@ export const ViolationDialog = ({ onSuccess }: ViolationDialogProps) => {
   
   // Get user's department from their role
   const userDepartmentId = roles.find(r => r.department_id)?.department_id;
+
+  // Check repeat offender status when student is selected
+  useEffect(() => {
+    const checkStudent = async () => {
+      if (!selectedStudent) {
+        setRepeatOffenderInfo(null);
+        return;
+      }
+      
+      setIsCheckingRepeat(true);
+      try {
+        const info = await checkRepeatOffender(selectedStudent);
+        setRepeatOffenderInfo(info);
+        
+        // Auto-suggest penalty based on history
+        if (info.isRepeatOffender) {
+          setFormData(prev => ({
+            ...prev,
+            dac_decision: info.suggestedDACDecision,
+          }));
+          
+          toast.warning(`⚠️ Repeat Offender Detected`, {
+            description: `This student has ${info.priorViolationCount} prior violation(s). Suggested penalty applied.`,
+            duration: 5000,
+          });
+        }
+      } catch (error) {
+        console.error('Error checking repeat offender:', error);
+      } finally {
+        setIsCheckingRepeat(false);
+      }
+    };
+    
+    checkStudent();
+  }, [selectedStudent]);
 
   // Only fetch students from the user's department
   const { data: students, isLoading: studentsLoading } = useQuery({
@@ -100,6 +140,9 @@ export const ViolationDialog = ({ onSuccess }: ViolationDialogProps) => {
     setIsSubmitting(true);
 
     try {
+      // Check repeat offender and set flag on violation
+      const isRepeat = repeatOffenderInfo?.isRepeatOffender || false;
+      
       const payload = {
         student_id: selectedStudent,
         exam_type: formData.exam_type as 'Mid Exam' | 'Final Exam',
@@ -111,13 +154,18 @@ export const ViolationDialog = ({ onSuccess }: ViolationDialogProps) => {
         dac_decision: formData.dac_decision as any,
         cmc_decision: formData.cmc_decision as any,
         description: formData.description.trim() || null,
+        is_repeat_offender: isRepeat,
       };
 
       const { error } = await supabase.from('violations').insert(payload);
 
       if (error) throw error;
 
-      toast.success('Violation record created successfully');
+      const notificationMessage = isRepeat 
+        ? `⚠️ Repeat offender violation recorded. Prior violations: ${repeatOffenderInfo?.priorViolationCount}`
+        : 'Violation record created successfully';
+      
+      toast.success(notificationMessage);
       queryClient.invalidateQueries({ queryKey: ['violations'] });
       queryClient.invalidateQueries({ queryKey: ['dashboard-stats'] });
       queryClient.invalidateQueries({ queryKey: ['recent-violations'] });
@@ -134,6 +182,7 @@ export const ViolationDialog = ({ onSuccess }: ViolationDialogProps) => {
   const resetForm = () => {
     setSelectedStudent(null);
     setStudentSearch('');
+    setRepeatOffenderInfo(null);
     setFormData({
       exam_type: '',
       incident_date: '',
@@ -170,16 +219,45 @@ export const ViolationDialog = ({ onSuccess }: ViolationDialogProps) => {
           <div className="space-y-2">
             <Label>Student *</Label>
             {selectedStudent && selectedStudentData ? (
-              <div className="flex items-center justify-between p-3 bg-muted rounded-lg">
-                <div>
-                  <p className="font-medium">{selectedStudentData.full_name}</p>
-                  <p className="text-sm text-muted-foreground">
-                    {selectedStudentData.student_id} • {(selectedStudentData as any).departments?.name}
-                  </p>
+              <div className="space-y-3">
+                <div className="flex items-center justify-between p-3 bg-muted rounded-lg">
+                  <div className="flex items-center gap-2">
+                    <div>
+                      <p className="font-medium">{selectedStudentData.full_name}</p>
+                      <p className="text-sm text-muted-foreground">
+                        {selectedStudentData.student_id} • {(selectedStudentData as any).departments?.name}
+                      </p>
+                    </div>
+                    {isCheckingRepeat && <Loader2 className="h-4 w-4 animate-spin" />}
+                    {repeatOffenderInfo?.isRepeatOffender && (
+                      <Badge className={getRiskLevelColor(repeatOffenderInfo.riskLevel)}>
+                        {repeatOffenderInfo.priorViolationCount} Prior Offense{repeatOffenderInfo.priorViolationCount > 1 ? 's' : ''}
+                      </Badge>
+                    )}
+                  </div>
+                  <Button type="button" variant="ghost" size="sm" onClick={() => setSelectedStudent(null)}>
+                    Change
+                  </Button>
                 </div>
-                <Button type="button" variant="ghost" size="sm" onClick={() => setSelectedStudent(null)}>
-                  Change
-                </Button>
+                
+                {/* Repeat Offender Alert */}
+                {repeatOffenderInfo?.isRepeatOffender && (
+                  <Alert variant="destructive" className="border-2">
+                    <AlertTriangle className="h-4 w-4" />
+                    <AlertTitle className="font-bold">Repeat Offender Alert</AlertTitle>
+                    <AlertDescription className="space-y-2">
+                      <p>{repeatOffenderInfo.escalationMessage}</p>
+                      <div className="flex gap-2 mt-2">
+                        <Badge variant="outline" className="bg-background">
+                          Suggested DAC: {repeatOffenderInfo.suggestedDACDecision}
+                        </Badge>
+                        <Badge variant="outline" className="bg-background">
+                          Suggested CMC: {repeatOffenderInfo.suggestedCMCDecision}
+                        </Badge>
+                      </div>
+                    </AlertDescription>
+                  </Alert>
+                )}
               </div>
             ) : (
               <div className="relative">
@@ -301,7 +379,15 @@ export const ViolationDialog = ({ onSuccess }: ViolationDialogProps) => {
 
           {/* DAC Decision - only show for initial recording */}
           <div className="space-y-2">
-            <Label>DAC Decision (Initial)</Label>
+            <Label className="flex items-center gap-2">
+              DAC Decision (Initial)
+              {repeatOffenderInfo?.isRepeatOffender && (
+                <Badge variant="outline" className="text-[10px] font-normal">
+                  <Star className="h-3 w-3 mr-1 fill-warning text-warning" />
+                  Suggested: {repeatOffenderInfo.suggestedDACDecision}
+                </Badge>
+              )}
+            </Label>
             <Select
               value={formData.dac_decision}
               onValueChange={(v) => setFormData({ ...formData, dac_decision: v })}
@@ -312,13 +398,20 @@ export const ViolationDialog = ({ onSuccess }: ViolationDialogProps) => {
               <SelectContent>
                 {dacDecisionOptions.map((status) => (
                   <SelectItem key={status} value={status}>
-                    {status}
+                    <span className="flex items-center gap-2">
+                      {status}
+                      {repeatOffenderInfo?.suggestedDACDecision === status && repeatOffenderInfo?.isRepeatOffender && (
+                        <Star className="h-3 w-3 fill-warning text-warning" />
+                      )}
+                    </span>
                   </SelectItem>
                 ))}
               </SelectContent>
             </Select>
             <p className="text-xs text-muted-foreground">
-              CMC decision will be set after approval workflow is complete.
+              {repeatOffenderInfo?.isRepeatOffender 
+                ? '⚠️ Escalated penalty suggested based on ASTU legislation. CMC decision will be set after approval workflow.'
+                : 'CMC decision will be set after approval workflow is complete.'}
             </p>
           </div>
 
