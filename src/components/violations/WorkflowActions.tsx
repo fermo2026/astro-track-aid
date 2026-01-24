@@ -29,24 +29,7 @@ import {
   Lock,
 } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
-
-const dacDecisionOptions = [
-  'Pending',
-  'One Grade Down',
-  'F Grade for Course',
-  'F Grade with Disciplinary Action',
-  'Referred to Discipline Committee',
-  'Cleared',
-];
-
-const cmcDecisionOptions = [
-  'Pending',
-  'One Grade Down',
-  'F Grade for Course',
-  'F Grade with Disciplinary Action',
-  'Referred to Discipline Committee',
-  'Cleared',
-];
+import { dacDecisionOptions, cmcDecisionOptions } from '@/constants/violationOptions';
 
 interface WorkflowActionsProps {
   violation: any;
