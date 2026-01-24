@@ -36,21 +36,24 @@ import { cn } from '@/lib/utils';
 import { useAuth } from '@/contexts/AuthContext';
 
 const getStatusColor = (status: string) => {
-  switch (status) {
-    case 'Pending':
-      return 'bg-warning/10 text-warning border-warning/20';
-    case 'One Grade Down':
-      return 'bg-orange-500/10 text-orange-600 border-orange-500/20';
-    case 'F Grade for Course':
-    case 'F Grade with Disciplinary Action':
-      return 'bg-destructive/10 text-destructive border-destructive/20';
-    case 'Cleared':
-      return 'bg-success/10 text-success border-success/20';
-    case 'Referred to Discipline Committee':
-      return 'bg-destructive/20 text-destructive border-destructive/30';
-    default:
-      return 'bg-muted text-muted-foreground';
-  }
+  // Severe decisions - destructive styling
+  const severeDecisions = ['Dismissal', 'Suspension (1 Academic Year)', 'Referred to University Discipline Committee'];
+  // Warning decisions - warning/orange styling  
+  const warningDecisions = [
+    'F Grade for Course', 'F Grade with Academic Probation', 
+    'Suspension (1 Semester)', 'Suspension (2 Semesters)',
+    'One Grade Deduction', 'Referred to CMC'
+  ];
+  // Pending decisions - muted styling
+  const pendingDecisions = ['Pending'];
+  // Cleared/minor decisions - success/outline styling
+  const clearedDecisions = ['Cleared', 'Verbal Warning', 'Written Warning', 'Uphold DAC Decision'];
+  
+  if (severeDecisions.includes(status)) return 'bg-destructive/20 text-destructive border-destructive/30';
+  if (warningDecisions.includes(status)) return 'bg-warning/10 text-warning border-warning/20';
+  if (pendingDecisions.includes(status)) return 'bg-muted text-muted-foreground border-muted';
+  if (clearedDecisions.includes(status)) return 'bg-success/10 text-success border-success/20';
+  return 'bg-orange-500/10 text-orange-600 border-orange-500/20';
 };
 
 const getWorkflowLabel = (status: string) => {

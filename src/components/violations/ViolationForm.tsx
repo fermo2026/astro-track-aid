@@ -14,25 +14,7 @@ import {
 } from '@/components/ui/select';
 import { departments, programs } from '@/data/mockData';
 import { useToast } from '@/hooks/use-toast';
-
-const violationTypes = [
-  'Cheating with Notes',
-  'Copying from Another Student',
-  'Using Electronic Device',
-  'Impersonation',
-  'Collaboration',
-  'Plagiarism',
-  'Other',
-];
-
-const decisionStatuses = [
-  'Pending',
-  'One Grade Down',
-  'F Grade for Course',
-  'F Grade with Disciplinary Action',
-  'Referred to Discipline Committee',
-  'Cleared',
-];
+import { violationTypes, dacDecisionOptions, cmcDecisionOptions } from '@/constants/violationOptions';
 
 export const ViolationForm = () => {
   const navigate = useNavigate();
@@ -177,7 +159,7 @@ export const ViolationForm = () => {
                     <SelectValue placeholder="Select DAC decision" />
                   </SelectTrigger>
                   <SelectContent>
-                    {decisionStatuses.map((status) => (
+                    {dacDecisionOptions.map((status) => (
                       <SelectItem key={status} value={status}>
                         {status}
                       </SelectItem>
@@ -192,7 +174,7 @@ export const ViolationForm = () => {
                     <SelectValue placeholder="Select CMC decision" />
                   </SelectTrigger>
                   <SelectContent>
-                    {decisionStatuses.map((status) => (
+                    {cmcDecisionOptions.map((status) => (
                       <SelectItem key={status} value={status}>
                         {status}
                       </SelectItem>

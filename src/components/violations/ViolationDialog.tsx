@@ -25,34 +25,7 @@ import { toast } from 'sonner';
 import { Plus, Loader2 } from 'lucide-react';
 import { z } from 'zod';
 import { useAuth } from '@/contexts/AuthContext';
-
-const violationTypes = [
-  'Cheating with Notes',
-  'Copying from Another Student',
-  'Using Electronic Device',
-  'Impersonation',
-  'Collaboration',
-  'Plagiarism',
-  'Other',
-];
-
-const dacDecisionStatuses = [
-  'Pending',
-  'One Grade Down',
-  'F Grade for Course',
-  'F Grade with Disciplinary Action',
-  'Referred to Discipline Committee',
-  'Cleared',
-];
-
-const cmcDecisionStatuses = [
-  'Pending',
-  'One Grade Down',
-  'F Grade for Course',
-  'F Grade with Disciplinary Action',
-  'Referred to Discipline Committee',
-  'Cleared',
-];
+import { violationTypes, dacDecisionOptions } from '@/constants/violationOptions';
 
 const formSchema = z.object({
   student_id: z.string().min(1, 'Student is required'),
@@ -337,7 +310,7 @@ export const ViolationDialog = ({ onSuccess }: ViolationDialogProps) => {
                 <SelectValue placeholder="Select DAC decision" />
               </SelectTrigger>
               <SelectContent>
-                {dacDecisionStatuses.map((status) => (
+                {dacDecisionOptions.map((status) => (
                   <SelectItem key={status} value={status}>
                     {status}
                   </SelectItem>
