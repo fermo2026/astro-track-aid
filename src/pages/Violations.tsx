@@ -1,10 +1,10 @@
 import { useState } from 'react';
-import { Search, ChevronDown, ChevronUp } from 'lucide-react';
+import { Search, Eye, AlertTriangle } from 'lucide-react';
 import { useQuery } from '@tanstack/react-query';
 import { MainLayout } from '@/components/layout/MainLayout';
 import { ViolationDialog } from '@/components/violations/ViolationDialog';
 import { ViolationHistoryDialog } from '@/components/violations/ViolationHistoryDialog';
-import { WorkflowActions } from '@/components/violations/WorkflowActions';
+import { QuickApprovalActions } from '@/components/violations/QuickApprovalActions';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent } from '@/components/ui/card';
@@ -25,28 +25,26 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import {
-  Collapsible,
-  CollapsibleContent,
-  CollapsibleTrigger,
-} from '@/components/ui/collapsible';
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from '@/components/ui/dialog';
 import { supabase } from '@/integrations/supabase/client';
 import { ExportButton } from '@/components/export/ExportButton';
-import { Loader2, FileText, AlertTriangle } from 'lucide-react';
+import { Loader2, FileText } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useAuth } from '@/contexts/AuthContext';
 
 const getStatusColor = (status: string) => {
-  // Severe decisions - destructive styling
   const severeDecisions = ['Dismissal', 'Suspension (1 Academic Year)', 'Referred to University Discipline Committee'];
-  // Warning decisions - warning/orange styling  
   const warningDecisions = [
     'F Grade for Course', 'F Grade with Academic Probation', 
     'Suspension (1 Semester)', 'Suspension (2 Semesters)',
     'One Grade Deduction', 'Referred to CMC'
   ];
-  // Pending decisions - muted styling
   const pendingDecisions = ['Pending'];
-  // Cleared/minor decisions - success/outline styling
   const clearedDecisions = ['Cleared', 'Verbal Warning', 'Written Warning', 'Uphold DAC Decision'];
   
   if (severeDecisions.includes(status)) return 'bg-destructive/20 text-destructive border-destructive/30';
@@ -56,57 +54,123 @@ const getStatusColor = (status: string) => {
   return 'bg-orange-500/10 text-orange-600 border-orange-500/20';
 };
 
-const getWorkflowLabel = (status: string) => {
-  const labels: Record<string, string> = {
-    draft: 'Draft',
-    submitted_to_head: 'Pending Head',
-    approved_by_head: 'Head Approved',
-    submitted_to_avd: 'Pending AVD',
-    approved_by_avd: 'AVD Approved',
-    pending_cmc: 'Pending CMC',
-    cmc_decided: 'CMC Decided',
-    closed: 'Closed',
-  };
-  return labels[status] || status;
-};
+// Detail view dialog for a violation
+const ViolationDetailDialog = ({ violation, trigger }: { violation: any; trigger: React.ReactNode }) => {
+  return (
+    <Dialog>
+      <DialogTrigger asChild>{trigger}</DialogTrigger>
+      <DialogContent className="max-w-2xl">
+        <DialogHeader>
+          <DialogTitle className="flex items-center gap-2">
+            Case Details
+            {violation.is_repeat_offender && (
+              <Badge variant="destructive" className="text-xs">
+                <AlertTriangle className="h-3 w-3 mr-1" />
+                Repeat Offender
+              </Badge>
+            )}
+          </DialogTitle>
+        </DialogHeader>
+        
+        <div className="space-y-6">
+          {/* Student Info */}
+          <div className="bg-muted/30 rounded-lg p-4">
+            <h4 className="text-sm font-medium text-muted-foreground mb-2">Student Information</h4>
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <p className="text-sm text-muted-foreground">Name</p>
+                <p className="font-semibold">{violation.students?.full_name}</p>
+              </div>
+              <div>
+                <p className="text-sm text-muted-foreground">ID</p>
+                <p className="font-mono">{violation.students?.student_id}</p>
+              </div>
+              <div>
+                <p className="text-sm text-muted-foreground">Department</p>
+                <p>{violation.students?.departments?.name || '—'}</p>
+              </div>
+              <div>
+                <p className="text-sm text-muted-foreground">Program</p>
+                <p>{violation.students?.program}</p>
+              </div>
+            </div>
+          </div>
 
-const getWorkflowColor = (status: string) => {
-  switch (status) {
-    case 'draft':
-      return 'bg-muted text-muted-foreground';
-    case 'submitted_to_head':
-    case 'submitted_to_avd':
-    case 'pending_cmc':
-      return 'bg-warning/10 text-warning border-warning/20';
-    case 'approved_by_head':
-    case 'approved_by_avd':
-      return 'bg-info/10 text-info border-info/20';
-    case 'cmc_decided':
-    case 'closed':
-      return 'bg-success/10 text-success border-success/20';
-    default:
-      return 'bg-muted text-muted-foreground';
-  }
+          {/* Incident Info */}
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <p className="text-sm text-muted-foreground">Course</p>
+              <p className="font-semibold">{violation.course_name}</p>
+              <p className="text-sm font-mono text-muted-foreground">{violation.course_code}</p>
+            </div>
+            <div>
+              <p className="text-sm text-muted-foreground">Exam Date</p>
+              <p className="font-semibold">
+                {new Date(violation.incident_date).toLocaleDateString('en-US', {
+                  year: 'numeric',
+                  month: 'long',
+                  day: 'numeric'
+                })}
+              </p>
+            </div>
+            <div>
+              <p className="text-sm text-muted-foreground">Exam Type</p>
+              <p>{violation.exam_type}</p>
+            </div>
+            <div>
+              <p className="text-sm text-muted-foreground">Invigilator</p>
+              <p>{violation.invigilator}</p>
+            </div>
+            <div>
+              <p className="text-sm text-muted-foreground">Violation Type</p>
+              <Badge variant="outline">{violation.violation_type}</Badge>
+            </div>
+          </div>
+
+          {/* Decisions */}
+          <div className="border-t pt-4">
+            <h4 className="text-sm font-medium text-muted-foreground mb-3">Decisions</h4>
+            <div className="flex gap-4">
+              <div className="flex-1 bg-muted/20 rounded-lg p-3">
+                <p className="text-xs text-muted-foreground mb-1">DAC Decision</p>
+                <Badge className={cn('border', getStatusColor(violation.dac_decision))}>
+                  {violation.dac_decision}
+                </Badge>
+              </div>
+              <div className="flex-1 bg-muted/20 rounded-lg p-3">
+                <p className="text-xs text-muted-foreground mb-1">CMC Decision</p>
+                <Badge className={cn('border', getStatusColor(violation.cmc_decision))}>
+                  {violation.cmc_decision}
+                </Badge>
+              </div>
+            </div>
+          </div>
+
+          {/* Notes */}
+          {violation.description && (
+            <div className="border-t pt-4">
+              <h4 className="text-sm font-medium text-muted-foreground mb-2">Notes</h4>
+              <p className="text-sm whitespace-pre-wrap">{violation.description}</p>
+            </div>
+          )}
+        </div>
+      </DialogContent>
+    </Dialog>
+  );
 };
 
 const Violations = () => {
   const [searchQuery, setSearchQuery] = useState('');
   const [departmentFilter, setDepartmentFilter] = useState('all');
   const [statusFilter, setStatusFilter] = useState('all');
-  const [expandedRow, setExpandedRow] = useState<string | null>(null);
   const { isSystemAdmin, roles } = useAuth();
   
-  // Only department head or deputy from the same department can create violations
-  // System admin cannot create violations - they are management/view-only at this level
   const isHead = roles.some(r => r.role === 'department_head');
   const isDeputy = roles.some(r => r.role === 'deputy_department_head');
   const isAVD = roles.some(r => r.role === 'academic_vice_dean');
   const userDepartmentId = roles.find(r => r.department_id)?.department_id;
   
-  // Only department head or deputy can ADD violations (not AVD, not system admin)
   const canAddViolation = (isHead || isDeputy) && userDepartmentId;
-  
-  // CMC decisions only visible to AVD and system admin
   const canSeeCMC = isSystemAdmin || isAVD;
 
   const { data: departments } = useQuery({
@@ -178,7 +242,7 @@ const Violations = () => {
           <div>
             <h1 className="text-3xl font-bold text-foreground">Violation Records</h1>
             <p className="text-muted-foreground mt-1">
-              Manage and track all examination violation cases
+              Manage and track examination violation cases
             </p>
           </div>
           <div className="flex items-center gap-2">
@@ -228,7 +292,7 @@ const Violations = () => {
           </CardContent>
         </Card>
 
-        {/* Table */}
+        {/* Simplified Table */}
         <Card>
           <CardContent className="p-0">
             {isLoading ? (
@@ -239,167 +303,92 @@ const Violations = () => {
               <div className="overflow-x-auto">
                 <Table>
                   <TableHeader>
-                    <TableRow className="bg-muted/50 hover:bg-muted/50 border-b-2">
-                      <TableHead className="px-4 py-3">Student Name & ID</TableHead>
-                      <TableHead className="px-4 py-3">Department</TableHead>
-                      <TableHead className="px-4 py-3">Course Name & Code</TableHead>
-                      <TableHead className="px-4 py-3">Exam Date</TableHead>
-                      <TableHead className="px-4 py-3">Invigilator</TableHead>
-                      <TableHead className="px-4 py-3 text-center">DAC Decision</TableHead>
-                      {canSeeCMC && <TableHead className="px-4 py-3 text-center">CMC Decision</TableHead>}
-                      <TableHead className="px-4 py-3 w-[50px]"></TableHead>
+                    <TableRow className="bg-muted/50 hover:bg-muted/50">
+                      <TableHead className="w-[200px]">Student</TableHead>
+                      <TableHead className="w-[80px]">Dept</TableHead>
+                      <TableHead>Course</TableHead>
+                      <TableHead className="w-[100px]">Date</TableHead>
+                      <TableHead className="w-[120px] text-center">DAC</TableHead>
+                      {canSeeCMC && <TableHead className="w-[120px] text-center">CMC</TableHead>}
+                      <TableHead className="w-[140px] text-center">Action</TableHead>
+                      <TableHead className="w-[50px]"></TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
                     {filteredViolations.map((v: any) => (
-                      <Collapsible
-                        key={v.id}
-                        open={expandedRow === v.id}
-                        onOpenChange={(open) => setExpandedRow(open ? v.id : null)}
-                      >
-                        <TableRow className="group cursor-pointer hover:bg-muted/30 transition-colors">
-                          <TableCell className="px-4 py-3">
-                            <div className="flex items-center gap-2">
-                              <ViolationHistoryDialog
-                                studentId={v.students?.id}
-                                studentName={v.students?.full_name}
-                                studentIdNumber={v.students?.student_id}
-                                trigger={
-                                  <button className="text-left hover:text-primary transition-colors">
-                                    <p className="font-semibold text-foreground">{v.students?.full_name}</p>
-                                    <p className="text-xs text-muted-foreground font-mono">{v.students?.student_id}</p>
-                                  </button>
-                                }
-                              />
-                              {v.is_repeat_offender && (
-                                <Badge variant="destructive" className="shrink-0 text-[10px] px-1.5 py-0">
-                                  <AlertTriangle className="h-2.5 w-2.5 mr-0.5" />
-                                  R
-                                </Badge>
-                              )}
-                            </div>
-                          </TableCell>
-                          <TableCell className="px-4 py-3">
-                            <Badge variant="outline" className="font-medium text-xs">
-                              {v.students?.departments?.code || '—'}
-                            </Badge>
-                          </TableCell>
-                          <TableCell className="px-4 py-3">
-                            <div>
-                              <p className="font-medium text-foreground">{v.course_name}</p>
-                              <p className="text-xs text-muted-foreground font-mono">{v.course_code}</p>
-                            </div>
-                          </TableCell>
-                          <TableCell className="px-4 py-3 text-muted-foreground">
-                            {new Date(v.incident_date).toLocaleDateString('en-US', {
-                              year: 'numeric',
-                              month: 'short',
-                              day: 'numeric'
-                            })}
-                          </TableCell>
-                          <TableCell className="px-4 py-3 text-foreground">
-                            {v.invigilator}
-                          </TableCell>
-                          <TableCell className="px-4 py-3 text-center">
+                      <TableRow key={v.id} className="hover:bg-muted/30">
+                        <TableCell className="py-2">
+                          <div className="flex items-center gap-2">
+                            <ViolationHistoryDialog
+                              studentId={v.students?.id}
+                              studentName={v.students?.full_name}
+                              studentIdNumber={v.students?.student_id}
+                              trigger={
+                                <button className="text-left hover:text-primary transition-colors">
+                                  <p className="font-medium text-sm">{v.students?.full_name}</p>
+                                  <p className="text-xs text-muted-foreground font-mono">{v.students?.student_id}</p>
+                                </button>
+                              }
+                            />
+                            {v.is_repeat_offender && (
+                              <Badge variant="destructive" className="shrink-0 text-[10px] px-1 py-0 h-4">
+                                R
+                              </Badge>
+                            )}
+                          </div>
+                        </TableCell>
+                        <TableCell className="py-2">
+                          <Badge variant="outline" className="text-xs font-medium">
+                            {v.students?.departments?.code || '—'}
+                          </Badge>
+                        </TableCell>
+                        <TableCell className="py-2">
+                          <p className="text-sm font-medium truncate max-w-[150px]">{v.course_name}</p>
+                          <p className="text-xs text-muted-foreground font-mono">{v.course_code}</p>
+                        </TableCell>
+                        <TableCell className="py-2 text-sm text-muted-foreground">
+                          {new Date(v.incident_date).toLocaleDateString('en-US', {
+                            month: 'short',
+                            day: 'numeric',
+                            year: '2-digit'
+                          })}
+                        </TableCell>
+                        <TableCell className="py-2 text-center">
+                          <Badge 
+                            className={cn(
+                              'border text-[10px] font-medium',
+                              getStatusColor(v.dac_decision)
+                            )}
+                          >
+                            {v.dac_decision}
+                          </Badge>
+                        </TableCell>
+                        {canSeeCMC && (
+                          <TableCell className="py-2 text-center">
                             <Badge 
                               className={cn(
-                                'border text-xs font-medium',
-                                getStatusColor(v.dac_decision)
+                                'border text-[10px] font-medium',
+                                getStatusColor(v.cmc_decision)
                               )}
                             >
-                              {v.dac_decision}
+                              {v.cmc_decision}
                             </Badge>
                           </TableCell>
-                          {canSeeCMC && (
-                            <TableCell className="px-4 py-3 text-center">
-                              <Badge 
-                                className={cn(
-                                  'border text-xs font-medium',
-                                  getStatusColor(v.cmc_decision)
-                                )}
-                              >
-                                {v.cmc_decision}
-                              </Badge>
-                            </TableCell>
-                          )}
-                          <TableCell className="px-4 py-3 text-center">
-                            <CollapsibleTrigger asChild>
-                              <Button 
-                                variant="ghost" 
-                                size="icon" 
-                                className="h-7 w-7 rounded-full hover:bg-primary/10"
-                              >
-                                {expandedRow === v.id ? (
-                                  <ChevronUp className="h-4 w-4 text-primary" />
-                                ) : (
-                                  <ChevronDown className="h-4 w-4 text-muted-foreground group-hover:text-primary" />
-                                )}
+                        )}
+                        <TableCell className="py-2 text-center">
+                          <QuickApprovalActions violation={v} />
+                        </TableCell>
+                        <TableCell className="py-2">
+                          <ViolationDetailDialog
+                            violation={v}
+                            trigger={
+                              <Button variant="ghost" size="icon" className="h-7 w-7">
+                                <Eye className="h-4 w-4 text-muted-foreground" />
                               </Button>
-                            </CollapsibleTrigger>
-                          </TableCell>
-                        </TableRow>
-                        <CollapsibleContent asChild>
-                          <tr>
-                            <td colSpan={canSeeCMC ? 8 : 7} className="p-0">
-                              <div className="bg-muted/20 border-y border-border/50 px-8 py-5">
-                                <div className="space-y-4">
-                                  <div className="grid grid-cols-2 md:grid-cols-5 gap-6 text-sm">
-                                    <div className="space-y-1">
-                                      <span className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
-                                        Violation Type
-                                      </span>
-                                      <p className="font-semibold text-foreground">{v.violation_type}</p>
-                                    </div>
-                                    <div className="space-y-1">
-                                      <span className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
-                                        Exam Type
-                                      </span>
-                                      <p className="font-semibold text-foreground">{v.exam_type}</p>
-                                    </div>
-                                    <div className="space-y-1">
-                                      <span className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
-                                        Workflow Status
-                                      </span>
-                                      <Badge 
-                                        className={cn(
-                                          'border text-xs font-medium mt-1',
-                                          getWorkflowColor(v.workflow_status)
-                                        )}
-                                      >
-                                        {getWorkflowLabel(v.workflow_status)}
-                                      </Badge>
-                                    </div>
-                                    <div className="space-y-1">
-                                      <span className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
-                                        Program
-                                      </span>
-                                      <p className="font-semibold text-foreground">{v.students?.program}</p>
-                                    </div>
-                                  </div>
-                                  
-                                  {v.description && (
-                                    <div className="space-y-1 pt-2 border-t border-border/50">
-                                      <span className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
-                                        Additional Notes
-                                      </span>
-                                      <p className="text-sm text-foreground whitespace-pre-wrap leading-relaxed">
-                                        {v.description}
-                                      </p>
-                                    </div>
-                                  )}
-
-                                  <div className="pt-3 border-t border-border/50">
-                                    <WorkflowActions
-                                      violation={v}
-                                      onClose={() => setExpandedRow(null)}
-                                    />
-                                  </div>
-                                </div>
-                              </div>
-                            </td>
-                          </tr>
-                        </CollapsibleContent>
-                      </Collapsible>
+                            }
+                          />
+                        </TableCell>
+                      </TableRow>
                     ))}
                   </TableBody>
                 </Table>
