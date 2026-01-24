@@ -242,6 +242,7 @@ export type Database = {
       }
       violations: {
         Row: {
+          academic_settings_id: string | null
           approved_by_avd: string | null
           approved_by_head: string | null
           avd_approved_at: string | null
@@ -271,6 +272,7 @@ export type Database = {
           workflow_status: Database["public"]["Enums"]["workflow_status"]
         }
         Insert: {
+          academic_settings_id?: string | null
           approved_by_avd?: string | null
           approved_by_head?: string | null
           avd_approved_at?: string | null
@@ -300,6 +302,7 @@ export type Database = {
           workflow_status?: Database["public"]["Enums"]["workflow_status"]
         }
         Update: {
+          academic_settings_id?: string | null
           approved_by_avd?: string | null
           approved_by_head?: string | null
           avd_approved_at?: string | null
@@ -329,6 +332,13 @@ export type Database = {
           workflow_status?: Database["public"]["Enums"]["workflow_status"]
         }
         Relationships: [
+          {
+            foreignKeyName: "violations_academic_settings_id_fkey"
+            columns: ["academic_settings_id"]
+            isOneToOne: false
+            referencedRelation: "academic_settings"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "violations_student_id_fkey"
             columns: ["student_id"]
@@ -379,7 +389,14 @@ export type Database = {
         | "F Grade for Course"
         | "F Grade with Disciplinary Action"
         | "Referred to Discipline Committee"
-      exam_type: "Mid Exam" | "Final Exam"
+      exam_type:
+        | "Mid Exam"
+        | "Final Exam"
+        | "Quiz"
+        | "Assignment"
+        | "Lab Exam"
+        | "Re-exam"
+        | "Makeup Exam"
       program_type: "BSc" | "MSc" | "PhD"
       violation_type:
         | "Cheating with Notes"
@@ -548,7 +565,15 @@ export const Constants = {
         "F Grade with Disciplinary Action",
         "Referred to Discipline Committee",
       ],
-      exam_type: ["Mid Exam", "Final Exam"],
+      exam_type: [
+        "Mid Exam",
+        "Final Exam",
+        "Quiz",
+        "Assignment",
+        "Lab Exam",
+        "Re-exam",
+        "Makeup Exam",
+      ],
       program_type: ["BSc", "MSc", "PhD"],
       violation_type: [
         "Cheating with Notes",

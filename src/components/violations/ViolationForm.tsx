@@ -14,7 +14,7 @@ import {
 } from '@/components/ui/select';
 import { departments, programs } from '@/data/mockData';
 import { useToast } from '@/hooks/use-toast';
-import { violationTypes, dacDecisionOptions, cmcDecisionOptions } from '@/constants/violationOptions';
+import { violationTypes, dacDecisionOptions, cmcDecisionOptions, examTypes } from '@/constants/violationOptions';
 
 export const ViolationForm = () => {
   const navigate = useNavigate();
@@ -107,8 +107,11 @@ export const ViolationForm = () => {
                     <SelectValue placeholder="Select exam type" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="Mid Exam">Mid Exam</SelectItem>
-                    <SelectItem value="Final Exam">Final Exam</SelectItem>
+                    {examTypes.map((type) => (
+                      <SelectItem key={type} value={type}>
+                        {type}
+                      </SelectItem>
+                    ))}
                   </SelectContent>
                 </Select>
               </div>
