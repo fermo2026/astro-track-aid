@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Search, Eye, AlertTriangle } from 'lucide-react';
+import { Search, Eye, AlertTriangle, Calendar } from 'lucide-react';
 import { useQuery } from '@tanstack/react-query';
 import { MainLayout } from '@/components/layout/MainLayout';
 import { ViolationDialog } from '@/components/violations/ViolationDialog';
@@ -37,6 +37,7 @@ import { ExportButton } from '@/components/export/ExportButton';
 import { Loader2, FileText } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useAuth } from '@/contexts/AuthContext';
+import { useAcademicSettings } from '@/hooks/useAcademicSettings';
 
 const getStatusColor = (status: string) => {
   const severeDecisions = ['Dismissal', 'Suspension (1 Academic Year)', 'Referred to University Discipline Committee'];
@@ -170,6 +171,7 @@ const Violations = () => {
   const [departmentFilter, setDepartmentFilter] = useState('all');
   const [statusFilter, setStatusFilter] = useState('all');
   const { isSystemAdmin, roles } = useAuth();
+  const { activeAcademicPeriod, hasActiveAcademicPeriod } = useAcademicSettings();
   
   const isHead = roles.some(r => r.role === 'department_head');
   const isDeputy = roles.some(r => r.role === 'deputy_department_head');
@@ -246,7 +248,15 @@ const Violations = () => {
         {/* Page Header */}
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
           <div>
-            <h1 className="text-3xl font-bold text-foreground">Violation Records</h1>
+            <div className="flex items-center gap-3">
+              <h1 className="text-3xl font-bold text-foreground">Violation Records</h1>
+              {activeAcademicPeriod && (
+                <Badge variant="secondary" className="font-normal text-sm">
+                  <Calendar className="h-3 w-3 mr-1" />
+                  {activeAcademicPeriod.academic_year} Sem {activeAcademicPeriod.semester}
+                </Badge>
+              )}
+            </div>
             <p className="text-muted-foreground mt-1">
               Manage and track examination violation cases
             </p>

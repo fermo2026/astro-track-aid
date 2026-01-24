@@ -24,11 +24,12 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { toast } from 'sonner';
-import { Plus, Loader2, AlertTriangle, Star } from 'lucide-react';
+import { Plus, Loader2, AlertTriangle, Star, Calendar, AlertCircle } from 'lucide-react';
 import { z } from 'zod';
 import { useAuth } from '@/contexts/AuthContext';
 import { violationTypes, dacDecisionOptions } from '@/constants/violationOptions';
 import { checkRepeatOffender, getRiskLevelColor, type RepeatOffenderInfo } from '@/utils/repeatOffenderDetection';
+import { useAcademicSettings } from '@/hooks/useAcademicSettings';
 
 const formSchema = z.object({
   student_id: z.string().min(1, 'Student is required'),
@@ -48,7 +49,8 @@ interface ViolationDialogProps {
 }
 
 export const ViolationDialog = ({ onSuccess }: ViolationDialogProps) => {
-  const { roles } = useAuth();
+  const { roles, isSystemAdmin } = useAuth();
+  const { activeAcademicPeriod, hasActiveAcademicPeriod, isLoading: academicLoading } = useAcademicSettings();
   const [open, setOpen] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [studentSearch, setStudentSearch] = useState('');
@@ -212,7 +214,27 @@ export const ViolationDialog = ({ onSuccess }: ViolationDialogProps) => {
           <DialogDescription>
             Enter the details of the examination violation incident.
           </DialogDescription>
+          {activeAcademicPeriod && (
+            <div className="flex items-center gap-2 mt-2">
+              <Calendar className="h-4 w-4 text-primary" />
+              <Badge variant="outline" className="font-normal">
+                {activeAcademicPeriod.academic_year} - Semester {activeAcademicPeriod.semester}
+              </Badge>
+            </div>
+          )}
         </DialogHeader>
+
+        {/* No Active Academic Period Warning */}
+        {!academicLoading && !hasActiveAcademicPeriod && !isSystemAdmin && (
+          <Alert variant="destructive">
+            <AlertCircle className="h-4 w-4" />
+            <AlertTitle>No Active Academic Period</AlertTitle>
+            <AlertDescription>
+              System administrator has not set an active academic year/semester. 
+              Please contact your system administrator.
+            </AlertDescription>
+          </Alert>
+        )}
 
         <form onSubmit={handleSubmit} className="space-y-6">
           {/* Student Selection */}
@@ -430,7 +452,10 @@ export const ViolationDialog = ({ onSuccess }: ViolationDialogProps) => {
             <Button type="button" variant="outline" onClick={() => setOpen(false)}>
               Cancel
             </Button>
-            <Button type="submit" disabled={isSubmitting || !selectedStudent}>
+            <Button 
+              type="submit" 
+              disabled={isSubmitting || !selectedStudent || (!hasActiveAcademicPeriod && !isSystemAdmin)}
+            >
               {isSubmitting && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
               Save Record
             </Button>

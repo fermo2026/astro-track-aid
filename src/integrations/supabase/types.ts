@@ -14,6 +14,36 @@ export type Database = {
   }
   public: {
     Tables: {
+      academic_settings: {
+        Row: {
+          academic_year: string
+          created_at: string
+          created_by: string | null
+          id: string
+          is_active: boolean
+          semester: string
+          updated_at: string
+        }
+        Insert: {
+          academic_year: string
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          is_active?: boolean
+          semester: string
+          updated_at?: string
+        }
+        Update: {
+          academic_year?: string
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          is_active?: boolean
+          semester?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       colleges: {
         Row: {
           code: string
