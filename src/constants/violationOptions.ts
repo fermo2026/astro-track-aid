@@ -51,7 +51,15 @@ export const cmcDecisionOptions = [
 ] as const;
 
 // Exam types
-export const examTypes = ['Mid Exam', 'Final Exam'] as const;
+export const examTypes = [
+  'Mid Exam',
+  'Final Exam',
+  'Quiz',
+  'Assignment',
+  'Lab Exam',
+  'Re-exam',
+  'Makeup Exam',
+] as const;
 
 // Type exports for TypeScript
 export type ViolationType = typeof violationTypes[number];

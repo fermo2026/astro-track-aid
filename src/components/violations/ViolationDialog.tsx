@@ -27,13 +27,13 @@ import { toast } from 'sonner';
 import { Plus, Loader2, AlertTriangle, Star, Calendar, AlertCircle } from 'lucide-react';
 import { z } from 'zod';
 import { useAuth } from '@/contexts/AuthContext';
-import { violationTypes, dacDecisionOptions } from '@/constants/violationOptions';
+import { violationTypes, dacDecisionOptions, examTypes } from '@/constants/violationOptions';
 import { checkRepeatOffender, getRiskLevelColor, type RepeatOffenderInfo } from '@/utils/repeatOffenderDetection';
 import { useAcademicSettings } from '@/hooks/useAcademicSettings';
 
 const formSchema = z.object({
   student_id: z.string().min(1, 'Student is required'),
-  exam_type: z.enum(['Mid Exam', 'Final Exam']),
+  exam_type: z.enum(['Mid Exam', 'Final Exam', 'Quiz', 'Assignment', 'Lab Exam', 'Re-exam', 'Makeup Exam']),
   incident_date: z.string().min(1, 'Incident date is required'),
   course_name: z.string().min(1, 'Course name is required').max(100),
   course_code: z.string().min(1, 'Course code is required').max(20),
@@ -42,6 +42,7 @@ const formSchema = z.object({
   dac_decision: z.string().optional(),
   cmc_decision: z.string().optional(),
   description: z.string().max(1000).optional(),
+  academic_settings_id: z.string().min(1, 'Academic period is required'),
 });
 
 interface ViolationDialogProps {
@@ -142,12 +143,18 @@ export const ViolationDialog = ({ onSuccess }: ViolationDialogProps) => {
     setIsSubmitting(true);
 
     try {
+      // Validate academic period is required for non-admins
+      if (!activeAcademicPeriod && !isSystemAdmin) {
+        toast.error('No active academic period set');
+        return;
+      }
+
       // Check repeat offender and set flag on violation
       const isRepeat = repeatOffenderInfo?.isRepeatOffender || false;
       
       const payload = {
         student_id: selectedStudent,
-        exam_type: formData.exam_type as 'Mid Exam' | 'Final Exam',
+        exam_type: formData.exam_type as any,
         incident_date: formData.incident_date,
         course_name: formData.course_name.trim(),
         course_code: formData.course_code.trim(),
@@ -157,6 +164,7 @@ export const ViolationDialog = ({ onSuccess }: ViolationDialogProps) => {
         cmc_decision: formData.cmc_decision as any,
         description: formData.description.trim() || null,
         is_repeat_offender: isRepeat,
+        academic_settings_id: activeAcademicPeriod?.id || null,
       };
 
       const { error } = await supabase.from('violations').insert(payload);
@@ -330,13 +338,17 @@ export const ViolationDialog = ({ onSuccess }: ViolationDialogProps) => {
               <Select
                 value={formData.exam_type}
                 onValueChange={(v) => setFormData({ ...formData, exam_type: v })}
+                required
               >
                 <SelectTrigger>
                   <SelectValue placeholder="Select exam type" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="Mid Exam">Mid Exam</SelectItem>
-                  <SelectItem value="Final Exam">Final Exam</SelectItem>
+                  {examTypes.map((type) => (
+                    <SelectItem key={type} value={type}>
+                      {type}
+                    </SelectItem>
+                  ))}
                 </SelectContent>
               </Select>
             </div>
