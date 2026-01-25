@@ -51,8 +51,10 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [roles, setRoles] = useState<UserRole[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [isDataLoading, setIsDataLoading] = useState(false);
 
   const fetchUserData = async (userId: string) => {
+    setIsDataLoading(true);
     try {
       // Fetch profile
       const { data: profileData, error: profileError } = await supabase
@@ -80,6 +82,8 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
       }
     } catch (error) {
       console.error('Error fetching user data:', error);
+    } finally {
+      setIsDataLoading(false);
     }
   };
 
@@ -91,10 +95,8 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
         setUser(session?.user ?? null);
 
         if (session?.user) {
-          // Use setTimeout to avoid race condition with profile creation trigger
-          setTimeout(() => {
-            fetchUserData(session.user.id);
-          }, 100);
+          // Await fetchUserData to ensure roles are loaded before isLoading becomes false
+          await fetchUserData(session.user.id);
         } else {
           setProfile(null);
           setRoles([]);
@@ -104,11 +106,11 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
     );
 
     // THEN get initial session
-    supabase.auth.getSession().then(({ data: { session } }) => {
+    supabase.auth.getSession().then(async ({ data: { session } }) => {
       setSession(session);
       setUser(session?.user ?? null);
       if (session?.user) {
-        fetchUserData(session.user.id);
+        await fetchUserData(session.user.id);
       }
       setIsLoading(false);
     });
