@@ -14,6 +14,7 @@ interface UserProfile {
 interface UserRole {
   role: string;
   department_id: string | null;
+  college_id: string | null;
 }
 
 interface AuthContextType {
@@ -69,7 +70,7 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
       // Fetch roles
       const { data: rolesData, error: rolesError } = await supabase
         .from('user_roles')
-        .select('role, department_id')
+        .select('role, department_id, college_id')
         .eq('user_id', userId);
 
       if (rolesError) {

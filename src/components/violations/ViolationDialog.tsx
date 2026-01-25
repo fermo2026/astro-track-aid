@@ -27,7 +27,7 @@ import { toast } from 'sonner';
 import { Plus, Loader2, AlertTriangle, Star, Calendar, AlertCircle } from 'lucide-react';
 import { z } from 'zod';
 import { useAuth } from '@/contexts/AuthContext';
-import { violationTypes, dacDecisionOptions, examTypes } from '@/constants/violationOptions';
+import { violationTypes, dacDecisionOptions, cmcDecisionOptions, examTypes } from '@/constants/violationOptions';
 import { checkRepeatOffender, getRiskLevelColor, type RepeatOffenderInfo } from '@/utils/repeatOffenderDetection';
 import { useAcademicSettings } from '@/hooks/useAcademicSettings';
 
@@ -71,7 +71,11 @@ export const ViolationDialog = ({ onSuccess }: ViolationDialogProps) => {
   });
   const queryClient = useQueryClient();
   
-  // Get user's department from their role
+  // Check if user is AVD (can create violations for any department in their college)
+  const isAVD = roles.some(r => r.role === 'academic_vice_dean');
+  const avdCollegeId = roles.find(r => r.role === 'academic_vice_dean')?.college_id;
+  
+  // Get user's department from their role (for non-AVD users)
   const userDepartmentId = roles.find(r => r.department_id)?.department_id;
 
   // Check repeat offender status when student is selected
@@ -109,9 +113,23 @@ export const ViolationDialog = ({ onSuccess }: ViolationDialogProps) => {
     checkStudent();
   }, [selectedStudent]);
 
-  // Only fetch students from the user's department
+  // Fetch departments for AVD's college
+  const { data: collegeDepartments } = useQuery({
+    queryKey: ['college-departments', avdCollegeId],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('departments')
+        .select('id')
+        .eq('college_id', avdCollegeId!);
+      if (error) throw error;
+      return data?.map(d => d.id) || [];
+    },
+    enabled: isAVD && !!avdCollegeId,
+  });
+
+  // Fetch students - AVD can see all students in their college's departments
   const { data: students, isLoading: studentsLoading } = useQuery({
-    queryKey: ['students-search', studentSearch, userDepartmentId],
+    queryKey: ['students-search', studentSearch, userDepartmentId, isAVD, collegeDepartments],
     queryFn: async () => {
       let query = supabase
         .from('students')
@@ -120,8 +138,11 @@ export const ViolationDialog = ({ onSuccess }: ViolationDialogProps) => {
         .order('full_name')
         .limit(10);
       
-      // Filter to user's department only
-      if (userDepartmentId) {
+      // AVD can see students from all departments in their college
+      if (isAVD && collegeDepartments && collegeDepartments.length > 0) {
+        query = query.in('department_id', collegeDepartments);
+      } else if (userDepartmentId) {
+        // Non-AVD users: filter to their department only
         query = query.eq('department_id', userDepartmentId);
       }
 
@@ -129,7 +150,7 @@ export const ViolationDialog = ({ onSuccess }: ViolationDialogProps) => {
       if (error) throw error;
       return data;
     },
-    enabled: open && studentSearch.length >= 2 && !!userDepartmentId,
+    enabled: open && studentSearch.length >= 2 && (!!userDepartmentId || (isAVD && !!collegeDepartments)),
   });
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -152,6 +173,11 @@ export const ViolationDialog = ({ onSuccess }: ViolationDialogProps) => {
       // Check repeat offender and set flag on violation
       const isRepeat = repeatOffenderInfo?.isRepeatOffender || false;
       
+      // For AVD-created violations, set workflow status to cmc_decided if CMC decision is not Pending
+      const workflowStatus = isAVD && formData.cmc_decision !== 'Pending' 
+        ? 'cmc_decided' 
+        : 'draft';
+      
       const payload = {
         student_id: selectedStudent,
         exam_type: formData.exam_type as any,
@@ -165,6 +191,14 @@ export const ViolationDialog = ({ onSuccess }: ViolationDialogProps) => {
         description: formData.description.trim() || null,
         is_repeat_offender: isRepeat,
         academic_settings_id: activeAcademicPeriod?.id || null,
+        workflow_status: workflowStatus as any,
+        // If AVD is setting decisions, record them as the decision maker
+        ...(isAVD && formData.dac_decision !== 'Pending' && {
+          dac_decision_date: new Date().toISOString().split('T')[0],
+        }),
+        ...(isAVD && formData.cmc_decision !== 'Pending' && {
+          cmc_decision_date: new Date().toISOString().split('T')[0],
+        }),
       };
 
       const { error } = await supabase.from('violations').insert(payload);
@@ -411,10 +445,10 @@ export const ViolationDialog = ({ onSuccess }: ViolationDialogProps) => {
             </div>
           </div>
 
-          {/* DAC Decision - only show for initial recording */}
+          {/* DAC Decision */}
           <div className="space-y-2">
             <Label className="flex items-center gap-2">
-              DAC Decision (Initial)
+              DAC Decision {isAVD ? '' : '(Initial)'}
               {repeatOffenderInfo?.isRepeatOffender && (
                 <Badge variant="outline" className="text-[10px] font-normal">
                   <Star className="h-3 w-3 mr-1 fill-warning text-warning" />
@@ -442,12 +476,52 @@ export const ViolationDialog = ({ onSuccess }: ViolationDialogProps) => {
                 ))}
               </SelectContent>
             </Select>
-            <p className="text-xs text-muted-foreground">
-              {repeatOffenderInfo?.isRepeatOffender 
-                ? '⚠️ Escalated penalty suggested based on ASTU legislation. CMC decision will be set after approval workflow.'
-                : 'CMC decision will be set after approval workflow is complete.'}
-            </p>
+            {!isAVD && (
+              <p className="text-xs text-muted-foreground">
+                {repeatOffenderInfo?.isRepeatOffender 
+                  ? '⚠️ Escalated penalty suggested based on ASTU legislation. CMC decision will be set after approval workflow.'
+                  : 'CMC decision will be set after approval workflow is complete.'}
+              </p>
+            )}
           </div>
+
+          {/* CMC Decision - Only for AVD */}
+          {isAVD && (
+            <div className="space-y-2">
+              <Label className="flex items-center gap-2">
+                CMC Decision
+                {repeatOffenderInfo?.isRepeatOffender && (
+                  <Badge variant="outline" className="text-[10px] font-normal">
+                    <Star className="h-3 w-3 mr-1 fill-warning text-warning" />
+                    Suggested: {repeatOffenderInfo.suggestedCMCDecision}
+                  </Badge>
+                )}
+              </Label>
+              <Select
+                value={formData.cmc_decision}
+                onValueChange={(v) => setFormData({ ...formData, cmc_decision: v })}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Select CMC decision" />
+                </SelectTrigger>
+                <SelectContent>
+                  {cmcDecisionOptions.map((status) => (
+                    <SelectItem key={status} value={status}>
+                      <span className="flex items-center gap-2">
+                        {status}
+                        {repeatOffenderInfo?.suggestedCMCDecision === status && repeatOffenderInfo?.isRepeatOffender && (
+                          <Star className="h-3 w-3 fill-warning text-warning" />
+                        )}
+                      </span>
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <p className="text-xs text-muted-foreground">
+                As AVD, you can set both DAC and CMC decisions simultaneously.
+              </p>
+            </div>
+          )}
 
           <div className="space-y-2">
             <Label>Additional Notes</Label>
