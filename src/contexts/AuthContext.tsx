@@ -1,4 +1,4 @@
-import { createContext, useContext, useEffect, useState, ReactNode } from 'react';
+import { createContext, useContext, useEffect, useState, ReactNode, useRef } from 'react';
 import { User, Session } from '@supabase/supabase-js';
 import { supabase } from '@/integrations/supabase/client';
 
@@ -51,71 +51,105 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [roles, setRoles] = useState<UserRole[]>([]);
   const [isLoading, setIsLoading] = useState(true);
-  const [isDataLoading, setIsDataLoading] = useState(false);
+  const initializationComplete = useRef(false);
 
-  const fetchUserData = async (userId: string) => {
-    setIsDataLoading(true);
+  const fetchUserData = async (userId: string): Promise<{ profile: UserProfile | null; roles: UserRole[] }> => {
     try {
-      // Fetch profile
-      const { data: profileData, error: profileError } = await supabase
-        .from('profiles')
-        .select('id, email, full_name, must_change_password, department_id, avatar_url')
-        .eq('id', userId)
-        .single();
+      // Fetch profile and roles in parallel
+      const [profileResult, rolesResult] = await Promise.all([
+        supabase
+          .from('profiles')
+          .select('id, email, full_name, must_change_password, department_id, avatar_url')
+          .eq('id', userId)
+          .single(),
+        supabase
+          .from('user_roles')
+          .select('role, department_id, college_id')
+          .eq('user_id', userId)
+      ]);
 
-      if (profileError) {
-        console.error('Error fetching profile:', profileError);
-      } else {
-        setProfile(profileData);
+      if (profileResult.error) {
+        console.error('Error fetching profile:', profileResult.error);
       }
 
-      // Fetch roles
-      const { data: rolesData, error: rolesError } = await supabase
-        .from('user_roles')
-        .select('role, department_id, college_id')
-        .eq('user_id', userId);
-
-      if (rolesError) {
-        console.error('Error fetching roles:', rolesError);
-      } else {
-        setRoles(rolesData || []);
+      if (rolesResult.error) {
+        console.error('Error fetching roles:', rolesResult.error);
       }
+
+      return {
+        profile: profileResult.data || null,
+        roles: rolesResult.data || []
+      };
     } catch (error) {
       console.error('Error fetching user data:', error);
-    } finally {
-      setIsDataLoading(false);
+      return { profile: null, roles: [] };
     }
   };
 
   useEffect(() => {
-    // Set up auth state listener FIRST
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      async (event, session) => {
-        setSession(session);
-        setUser(session?.user ?? null);
+    let isMounted = true;
 
-        if (session?.user) {
-          // Await fetchUserData to ensure roles are loaded before isLoading becomes false
-          await fetchUserData(session.user.id);
+    const initializeAuth = async () => {
+      try {
+        // Get initial session
+        const { data: { session: initialSession } } = await supabase.auth.getSession();
+        
+        if (!isMounted) return;
+
+        if (initialSession?.user) {
+          setSession(initialSession);
+          setUser(initialSession.user);
+          
+          // Fetch user data and wait for it to complete
+          const userData = await fetchUserData(initialSession.user.id);
+          
+          if (!isMounted) return;
+          
+          setProfile(userData.profile);
+          setRoles(userData.roles);
+        }
+        
+        initializationComplete.current = true;
+        setIsLoading(false);
+      } catch (error) {
+        console.error('Error initializing auth:', error);
+        if (isMounted) {
+          initializationComplete.current = true;
+          setIsLoading(false);
+        }
+      }
+    };
+
+    // Set up auth state listener
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(
+      async (event, newSession) => {
+        if (!isMounted) return;
+
+        // Only process after initial load is complete to avoid race conditions
+        if (!initializationComplete.current) return;
+
+        setSession(newSession);
+        setUser(newSession?.user ?? null);
+
+        if (newSession?.user) {
+          const userData = await fetchUserData(newSession.user.id);
+          if (isMounted) {
+            setProfile(userData.profile);
+            setRoles(userData.roles);
+          }
         } else {
           setProfile(null);
           setRoles([]);
         }
-        setIsLoading(false);
       }
     );
 
-    // THEN get initial session
-    supabase.auth.getSession().then(async ({ data: { session } }) => {
-      setSession(session);
-      setUser(session?.user ?? null);
-      if (session?.user) {
-        await fetchUserData(session.user.id);
-      }
-      setIsLoading(false);
-    });
+    initializeAuth();
 
-    return () => subscription.unsubscribe();
+    return () => {
+      isMounted = false;
+      subscription.unsubscribe();
+    };
   }, []);
 
   const signIn = async (email: string, password: string) => {
@@ -123,6 +157,19 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
       email,
       password,
     });
+    
+    if (!error) {
+      // Manually fetch user data after successful sign in
+      const { data: { session: newSession } } = await supabase.auth.getSession();
+      if (newSession?.user) {
+        setSession(newSession);
+        setUser(newSession.user);
+        const userData = await fetchUserData(newSession.user.id);
+        setProfile(userData.profile);
+        setRoles(userData.roles);
+      }
+    }
+    
     return { error };
   };
 
@@ -136,7 +183,9 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
 
   const refreshProfile = async () => {
     if (user) {
-      await fetchUserData(user.id);
+      const userData = await fetchUserData(user.id);
+      setProfile(userData.profile);
+      setRoles(userData.roles);
     }
   };
 
@@ -153,7 +202,9 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
         .eq('id', user.id);
 
       // Refresh profile data
-      await fetchUserData(user.id);
+      const userData = await fetchUserData(user.id);
+      setProfile(userData.profile);
+      setRoles(userData.roles);
     }
 
     return { error };
