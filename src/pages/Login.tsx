@@ -7,7 +7,7 @@ import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Loader2, AlertCircle } from 'lucide-react';
-import astuLogo from '@/assets/astu-logo.png';
+import astuLogo from '@/assets/astu-logo.jpg';
 
 const Login = () => {
   const [email, setEmail] = useState('');
