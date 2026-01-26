@@ -14,7 +14,7 @@ import {
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { useAuth } from '@/contexts/AuthContext';
 import { ProfileEditDialog } from '@/components/profile/ProfileEditDialog';
-import astuLogo from '@/assets/astu-logo.png';
+import astuLogo from '@/assets/astu-logo.jpg';
 
 interface HeaderProps {
   onSearch?: (query: string) => void;
