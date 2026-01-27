@@ -50,6 +50,7 @@ const Students = () => {
   const isHead = roles.some(r => r.role === 'department_head' || r.role === 'deputy_department_head');
   const isAVD = roles.some(r => r.role === 'academic_vice_dean');
   const canEditStudents = isSystemAdmin || isHead || isAVD;
+  const canImportStudents = isSystemAdmin || isAVD;
 
   const { data: departments } = useQuery({
     queryKey: ['departments'],
@@ -131,7 +132,7 @@ const Students = () => {
           </div>
           <div className="flex items-center gap-2">
             {canEditStudents && <StudentCreateDialog />}
-            {isSystemAdmin && <ImportDialog type="students" />}
+            {canImportStudents && <ImportDialog type="students" />}
             <ExportButton />
           </div>
         </div>
