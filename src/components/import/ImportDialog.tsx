@@ -16,6 +16,13 @@ import {
   DialogTrigger,
 } from '@/components/ui/dialog';
 import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
+import {
   Table,
   TableBody,
   TableCell,
@@ -27,6 +34,7 @@ import { toast } from 'sonner';
 import { Upload, Loader2, Download, FileSpreadsheet, AlertTriangle, CheckCircle, XCircle, ArrowLeft, Eye } from 'lucide-react';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { useAuth } from '@/contexts/AuthContext';
 
 type ImportType = 'students' | 'departments' | 'colleges';
 
@@ -111,7 +119,13 @@ export const ImportDialog = ({ type, onSuccess }: ImportDialogProps) => {
   const [step, setStep] = useState<'upload' | 'review'>('upload');
   const [validationResults, setValidationResults] = useState<ValidationResult[]>([]);
   const [parsedHeaders, setParsedHeaders] = useState<string[]>([]);
+  const [selectedDepartmentId, setSelectedDepartmentId] = useState<string>('');
   const queryClient = useQueryClient();
+  const { roles, isSystemAdmin } = useAuth();
+
+  // Check if user is AVD
+  const isAVD = roles.some(r => r.role === 'academic_vice_dean');
+  const avdCollegeId = roles.find(r => r.role === 'academic_vice_dean')?.college_id;
 
   // Fetch existing data for duplicate detection
   const { data: existingStudents } = useQuery({
@@ -125,9 +139,16 @@ export const ImportDialog = ({ type, onSuccess }: ImportDialogProps) => {
   });
 
   const { data: departments } = useQuery({
-    queryKey: ['departments-for-import'],
+    queryKey: ['departments-for-import', avdCollegeId, isAVD],
     queryFn: async () => {
-      const { data, error } = await supabase.from('departments').select('id, code');
+      let query = supabase.from('departments').select('id, code, name');
+      
+      // AVD can only import to departments in their college
+      if (isAVD && avdCollegeId) {
+        query = query.eq('college_id', avdCollegeId);
+      }
+      
+      const { data, error } = await query;
       if (error) throw error;
       return data;
     },
@@ -202,8 +223,8 @@ export const ImportDialog = ({ type, onSuccess }: ImportDialogProps) => {
         continue;
       }
 
-      // Check department
-      if (deptCode && !deptMap.has(deptCode.toLowerCase())) {
+      // Check department - if AVD selected one, use that instead of CSV
+      if (!isAVD && deptCode && !deptMap.has(deptCode.toLowerCase())) {
         results.push({
           row: i + 2,
           data,
@@ -237,6 +258,12 @@ export const ImportDialog = ({ type, onSuccess }: ImportDialogProps) => {
   const handleValidate = async () => {
     if (!file) {
       setError('Please select a file');
+      return;
+    }
+
+    // AVD must select a department for student imports
+    if (type === 'students' && isAVD && !selectedDepartmentId) {
+      setError('Please select a department for the students');
       return;
     }
 
@@ -297,10 +324,16 @@ export const ImportDialog = ({ type, onSuccess }: ImportDialogProps) => {
 
     const students = validRows.map((rowIdx) => {
       const row = rows[rowIdx];
+      
+      // For AVD, use the selected department; otherwise use CSV department_code
+      const departmentId = isAVD && selectedDepartmentId 
+        ? selectedDepartmentId 
+        : deptMap.get(row[deptCodeIdx]?.toLowerCase().trim()) || null;
+      
       return {
         student_id: row[studentIdIdx]?.trim(),
         full_name: row[fullNameIdx]?.trim(),
-        department_id: deptMap.get(row[deptCodeIdx]?.toLowerCase().trim()) || null,
+        department_id: departmentId,
         program: (row[programIdx]?.trim() || 'BSc') as 'BSc' | 'MSc' | 'PhD',
       };
     });
@@ -400,6 +433,7 @@ export const ImportDialog = ({ type, onSuccess }: ImportDialogProps) => {
     setStep('upload');
     setValidationResults([]);
     setError(null);
+    setSelectedDepartmentId('');
   };
 
   const typeLabel = type.charAt(0).toUpperCase() + type.slice(1);
@@ -409,6 +443,9 @@ export const ImportDialog = ({ type, onSuccess }: ImportDialogProps) => {
   const warningCount = validationResults.filter(r => r.status === 'warning').length;
   const errorCount = validationResults.filter(r => r.status === 'error').length;
   const canImport = (validCount + duplicateCount) > 0 && errorCount === 0;
+
+  // For AVD importing students, show department selector
+  const showDepartmentSelector = type === 'students' && isAVD;
 
   return (
     <Dialog open={open} onOpenChange={(o) => { if (!o) resetDialog(); else setOpen(o); }}>
@@ -427,11 +464,41 @@ export const ImportDialog = ({ type, onSuccess }: ImportDialogProps) => {
             {step === 'upload' 
               ? `Upload a CSV file to import ${type}. Download the template first to see the required format.`
               : 'Review the validation results before importing.'}
+            {showDepartmentSelector && step === 'upload' && (
+              <span className="block mt-1 text-primary font-medium">
+                As AVD, select the department where these students will be added.
+              </span>
+            )}
           </DialogDescription>
         </DialogHeader>
 
         {step === 'upload' ? (
           <div className="space-y-4">
+            {/* AVD Department Selector */}
+            {showDepartmentSelector && (
+              <div className="space-y-2">
+                <Label htmlFor="import-department">Target Department *</Label>
+                <Select
+                  value={selectedDepartmentId}
+                  onValueChange={setSelectedDepartmentId}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select department for students" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {departments?.map((dept) => (
+                      <SelectItem key={dept.id} value={dept.id}>
+                        {dept.name} ({dept.code})
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <p className="text-xs text-muted-foreground">
+                  All imported students will be assigned to this department
+                </p>
+              </div>
+            )}
+
             <Button
               variant="outline"
               className="w-full"
@@ -469,6 +536,15 @@ export const ImportDialog = ({ type, onSuccess }: ImportDialogProps) => {
           </div>
         ) : (
           <div className="space-y-4">
+            {/* Show selected department for AVD */}
+            {showDepartmentSelector && selectedDepartmentId && (
+              <Alert>
+                <AlertDescription>
+                  Students will be imported to: <strong>{departments?.find(d => d.id === selectedDepartmentId)?.name}</strong>
+                </AlertDescription>
+              </Alert>
+            )}
+
             {/* Summary */}
             <div className="flex flex-wrap gap-2">
               <Badge variant="outline" className="bg-green-500/10 text-green-600 border-green-500/20">
@@ -545,7 +621,7 @@ export const ImportDialog = ({ type, onSuccess }: ImportDialogProps) => {
             Cancel
           </Button>
           {step === 'upload' ? (
-            <Button onClick={handleValidate} disabled={!file || isValidating}>
+            <Button onClick={handleValidate} disabled={!file || isValidating || (showDepartmentSelector && !selectedDepartmentId)}>
               {isValidating && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
               <Eye className="h-4 w-4 mr-2" />
               Validate & Review

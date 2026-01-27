@@ -58,6 +58,7 @@ export const ViolationDialog = ({ onSuccess }: ViolationDialogProps) => {
   const [selectedStudent, setSelectedStudent] = useState<string | null>(null);
   const [repeatOffenderInfo, setRepeatOffenderInfo] = useState<RepeatOffenderInfo | null>(null);
   const [isCheckingRepeat, setIsCheckingRepeat] = useState(false);
+  const [selectedDepartmentId, setSelectedDepartmentId] = useState<string>('');
   const [formData, setFormData] = useState({
     exam_type: '',
     incident_date: '',
@@ -77,6 +78,21 @@ export const ViolationDialog = ({ onSuccess }: ViolationDialogProps) => {
   
   // Get user's department from their role (for non-AVD users)
   const userDepartmentId = roles.find(r => r.department_id)?.department_id;
+  
+  // Fetch departments for AVD's college (for department selector)
+  const { data: avdDepartments } = useQuery({
+    queryKey: ['avd-departments-list', avdCollegeId],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('departments')
+        .select('id, name, code')
+        .eq('college_id', avdCollegeId!)
+        .order('name');
+      if (error) throw error;
+      return data;
+    },
+    enabled: isAVD && !!avdCollegeId && open,
+  });
 
   // Check repeat offender status when student is selected
   useEffect(() => {
@@ -113,7 +129,7 @@ export const ViolationDialog = ({ onSuccess }: ViolationDialogProps) => {
     checkStudent();
   }, [selectedStudent]);
 
-  // Fetch departments for AVD's college
+  // Fetch departments for AVD's college (for filtering students)
   const { data: collegeDepartments } = useQuery({
     queryKey: ['college-departments', avdCollegeId],
     queryFn: async () => {
@@ -127,9 +143,12 @@ export const ViolationDialog = ({ onSuccess }: ViolationDialogProps) => {
     enabled: isAVD && !!avdCollegeId,
   });
 
-  // Fetch students - AVD can see all students in their college's departments
+  // Determine which department to filter students by
+  const effectiveDepartmentId = isAVD ? selectedDepartmentId : userDepartmentId;
+
+  // Fetch students - AVD must select department first, then search within that department
   const { data: students, isLoading: studentsLoading } = useQuery({
-    queryKey: ['students-search', studentSearch, userDepartmentId, isAVD, collegeDepartments],
+    queryKey: ['students-search', studentSearch, effectiveDepartmentId, isAVD],
     queryFn: async () => {
       let query = supabase
         .from('students')
@@ -138,19 +157,16 @@ export const ViolationDialog = ({ onSuccess }: ViolationDialogProps) => {
         .order('full_name')
         .limit(10);
       
-      // AVD can see students from all departments in their college
-      if (isAVD && collegeDepartments && collegeDepartments.length > 0) {
-        query = query.in('department_id', collegeDepartments);
-      } else if (userDepartmentId) {
-        // Non-AVD users: filter to their department only
-        query = query.eq('department_id', userDepartmentId);
+      // Filter by the effective department (selected by AVD or user's own department)
+      if (effectiveDepartmentId) {
+        query = query.eq('department_id', effectiveDepartmentId);
       }
 
       const { data, error } = await query;
       if (error) throw error;
       return data;
     },
-    enabled: open && studentSearch.length >= 2 && (!!userDepartmentId || (isAVD && !!collegeDepartments)),
+    enabled: open && studentSearch.length >= 2 && !!effectiveDepartmentId,
   });
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -227,6 +243,7 @@ export const ViolationDialog = ({ onSuccess }: ViolationDialogProps) => {
     setSelectedStudent(null);
     setStudentSearch('');
     setRepeatOffenderInfo(null);
+    setSelectedDepartmentId('');
     setFormData({
       exam_type: '',
       incident_date: '',
@@ -279,6 +296,36 @@ export const ViolationDialog = ({ onSuccess }: ViolationDialogProps) => {
         )}
 
         <form onSubmit={handleSubmit} className="space-y-6">
+          {/* AVD Department Selection */}
+          {isAVD && (
+            <div className="space-y-2">
+              <Label>Department *</Label>
+              <Select
+                value={selectedDepartmentId}
+                onValueChange={(v) => {
+                  setSelectedDepartmentId(v);
+                  // Clear student selection when department changes
+                  setSelectedStudent(null);
+                  setStudentSearch('');
+                }}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Select department first" />
+                </SelectTrigger>
+                <SelectContent>
+                  {avdDepartments?.map((dept) => (
+                    <SelectItem key={dept.id} value={dept.id}>
+                      {dept.name} ({dept.code})
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <p className="text-xs text-muted-foreground">
+                As AVD, select the department to search for students
+              </p>
+            </div>
+          )}
+
           {/* Student Selection */}
           <div className="space-y-2">
             <Label>Student *</Label>
@@ -325,41 +372,52 @@ export const ViolationDialog = ({ onSuccess }: ViolationDialogProps) => {
               </div>
             ) : (
               <div className="relative">
-                <Input
-                  placeholder="Type student ID or name to search..."
-                  value={studentSearch}
-                  onChange={(e) => setStudentSearch(e.target.value)}
-                />
-                {studentSearch.length >= 2 && (
-                  <div className="absolute z-50 w-full mt-1 bg-popover border rounded-lg shadow-lg max-h-48 overflow-y-auto">
-                    {studentsLoading ? (
-                      <div className="flex items-center justify-center py-4">
-                        <Loader2 className="h-5 w-5 animate-spin" />
-                      </div>
-                    ) : students && students.length > 0 ? (
-                      students.map((student: any) => (
-                        <button
-                          key={student.id}
-                          type="button"
-                          className="w-full text-left px-3 py-2 hover:bg-accent transition-colors border-b last:border-0"
-                          onClick={() => {
-                            setSelectedStudent(student.id);
-                            setStudentSearch('');
-                          }}
-                        >
-                          <p className="font-medium">{student.full_name}</p>
-                          <p className="text-sm text-muted-foreground">
-                            {student.student_id} • {student.departments?.name}
-                          </p>
-                        </button>
-                      ))
-                    ) : (
-                      <p className="text-sm text-muted-foreground text-center py-4">No students found</p>
-                    )}
+                {/* Show message if AVD hasn't selected department */}
+                {isAVD && !selectedDepartmentId ? (
+                  <div className="p-3 bg-muted rounded-lg text-center">
+                    <p className="text-sm text-muted-foreground">
+                      Please select a department above to search for students
+                    </p>
                   </div>
-                )}
-                {studentSearch.length > 0 && studentSearch.length < 2 && (
-                  <p className="text-xs text-muted-foreground mt-1">Type at least 2 characters to search</p>
+                ) : (
+                  <>
+                    <Input
+                      placeholder="Type student ID or name to search..."
+                      value={studentSearch}
+                      onChange={(e) => setStudentSearch(e.target.value)}
+                    />
+                    {studentSearch.length >= 2 && (
+                      <div className="absolute z-50 w-full mt-1 bg-popover border rounded-lg shadow-lg max-h-48 overflow-y-auto">
+                        {studentsLoading ? (
+                          <div className="flex items-center justify-center py-4">
+                            <Loader2 className="h-5 w-5 animate-spin" />
+                          </div>
+                        ) : students && students.length > 0 ? (
+                          students.map((student: any) => (
+                            <button
+                              key={student.id}
+                              type="button"
+                              className="w-full text-left px-3 py-2 hover:bg-accent transition-colors border-b last:border-0"
+                              onClick={() => {
+                                setSelectedStudent(student.id);
+                                setStudentSearch('');
+                              }}
+                            >
+                              <p className="font-medium">{student.full_name}</p>
+                              <p className="text-sm text-muted-foreground">
+                                {student.student_id} • {student.departments?.name}
+                              </p>
+                            </button>
+                          ))
+                        ) : (
+                          <p className="text-sm text-muted-foreground text-center py-4">No students found</p>
+                        )}
+                      </div>
+                    )}
+                    {studentSearch.length > 0 && studentSearch.length < 2 && (
+                      <p className="text-xs text-muted-foreground mt-1">Type at least 2 characters to search</p>
+                    )}
+                  </>
                 )}
               </div>
             )}
