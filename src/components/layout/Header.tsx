@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Bell, Search, User, LogOut } from 'lucide-react';
+import { User, LogOut, Search } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -14,6 +14,7 @@ import {
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { useAuth } from '@/contexts/AuthContext';
 import { ProfileEditDialog } from '@/components/profile/ProfileEditDialog';
+import { NotificationBell } from '@/components/notifications/NotificationBell';
 import astuLogo from '@/assets/astu-logo.jpg';
 
 interface HeaderProps {
@@ -82,9 +83,7 @@ export const Header = ({ onSearch }: HeaderProps) => {
       </div>
 
       <div className="flex items-center gap-4">
-        <Button variant="ghost" size="icon" className="text-primary-foreground hover:bg-primary-foreground/10">
-          <Bell className="h-5 w-5" />
-        </Button>
+        <NotificationBell />
 
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
