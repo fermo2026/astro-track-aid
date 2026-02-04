@@ -13,7 +13,6 @@ serve(async (req: Request): Promise<Response> => {
 
   try {
     const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
-    const supabaseAnonKey = Deno.env.get("SUPABASE_ANON_KEY")!;
     const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
 
     const authHeader = req.headers.get("Authorization");
@@ -24,29 +23,27 @@ serve(async (req: Request): Promise<Response> => {
       );
     }
 
-    // Create client with user's auth context to verify the token
-    const supabaseUser = createClient(supabaseUrl, supabaseAnonKey, {
-      global: { headers: { Authorization: authHeader } },
-    });
+    // Extract the token from the header
+    const token = authHeader.replace("Bearer ", "");
 
-    // Verify the user by getting their data with their own token
-    const { data: { user: requestingUser }, error: userError } = await supabaseUser.auth.getUser();
-
-    if (userError || !requestingUser) {
-      console.error("User verification error:", userError);
-      return new Response(
-        JSON.stringify({ error: "Invalid user token" }),
-        { status: 401, headers: { "Content-Type": "application/json", ...corsHeaders } }
-      );
-    }
-
-    // Create admin client for privileged operations
+    // Create admin client for all operations (including token verification)
     const supabaseAdmin = createClient(supabaseUrl, supabaseServiceKey, {
       auth: {
         autoRefreshToken: false,
         persistSession: false,
       },
     });
+
+    // Use getUser with token parameter to verify the JWT
+    const { data: { user: requestingUser }, error: userError } = await supabaseAdmin.auth.getUser(token);
+
+    if (userError || !requestingUser) {
+      console.error("Token verification error:", userError);
+      return new Response(
+        JSON.stringify({ error: "Invalid user token" }),
+        { status: 401, headers: { "Content-Type": "application/json", ...corsHeaders } }
+      );
+    }
 
     // Check if the requesting user is a system_admin
     const { data: roleData, error: roleError } = await supabaseAdmin
