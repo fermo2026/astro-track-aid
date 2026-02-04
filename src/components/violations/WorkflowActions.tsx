@@ -30,6 +30,7 @@ import {
 } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { dacDecisionOptions, cmcDecisionOptions } from '@/constants/violationOptions';
+import { triggerWorkflowNotification } from '@/hooks/useNotifications';
 
 interface WorkflowActionsProps {
   violation: any;
@@ -98,6 +99,8 @@ export const WorkflowActions = ({ violation, onClose }: WorkflowActionsProps) =>
 
   const handleWorkflowAction = async (newStatus: string, additionalData: Record<string, any> = {}) => {
     setIsSubmitting(true);
+    const previousStatus = violation.workflow_status;
+    
     try {
       const updateData: Record<string, any> = {
         workflow_status: newStatus,
@@ -112,6 +115,30 @@ export const WorkflowActions = ({ violation, onClose }: WorkflowActionsProps) =>
       if (error) throw error;
 
       toast.success('Workflow updated successfully');
+
+      // Trigger workflow notification
+      const departmentId = violation.students?.department_id;
+      let collegeId = '';
+      
+      if (departmentId) {
+        const { data: deptData } = await supabase
+          .from('departments')
+          .select('college_id')
+          .eq('id', departmentId)
+          .single();
+        collegeId = deptData?.college_id || '';
+      }
+
+      triggerWorkflowNotification({
+        violation_id: violation.id,
+        new_status: newStatus,
+        previous_status: previousStatus,
+        triggered_by: user?.id || '',
+        student_name: violation.students?.full_name || 'Student',
+        department_id: departmentId || '',
+        college_id: collegeId,
+      });
+
       queryClient.invalidateQueries({ queryKey: ['violations'] });
       onClose?.();
     } catch (error: any) {
@@ -128,6 +155,8 @@ export const WorkflowActions = ({ violation, onClose }: WorkflowActionsProps) =>
     }
 
     setIsSubmitting(true);
+    const previousStatus = violation.workflow_status;
+    
     try {
       const updateData: Record<string, any> = {};
       
@@ -156,6 +185,32 @@ export const WorkflowActions = ({ violation, onClose }: WorkflowActionsProps) =>
       if (error) throw error;
 
       toast.success(`${actionType.toUpperCase()} decision recorded`);
+
+      // Trigger workflow notification for CMC decisions
+      if (actionType === 'cmc') {
+        const departmentId = violation.students?.department_id;
+        let collegeId = '';
+        
+        if (departmentId) {
+          const { data: deptData } = await supabase
+            .from('departments')
+            .select('college_id')
+            .eq('id', departmentId)
+            .single();
+          collegeId = deptData?.college_id || '';
+        }
+
+        triggerWorkflowNotification({
+          violation_id: violation.id,
+          new_status: 'cmc_decided',
+          previous_status: previousStatus,
+          triggered_by: user?.id || '',
+          student_name: violation.students?.full_name || 'Student',
+          department_id: departmentId || '',
+          college_id: collegeId,
+        });
+      }
+
       queryClient.invalidateQueries({ queryKey: ['violations'] });
       setShowDecisionDialog(false);
       onClose?.();

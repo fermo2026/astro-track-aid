@@ -24,6 +24,7 @@ import {
 import { useAuth } from '@/contexts/AuthContext';
 import { dacDecisionOptions, cmcDecisionOptions } from '@/constants/violationOptions';
 import { checkRepeatOffender, type RepeatOffenderInfo } from '@/utils/repeatOffenderDetection';
+import { triggerWorkflowNotification } from '@/hooks/useNotifications';
 
 interface QuickApprovalActionsProps {
   violation: any;
@@ -69,6 +70,8 @@ export const QuickApprovalActions = ({ violation }: QuickApprovalActionsProps) =
 
   const handleQuickAction = async (action: string, data: Record<string, any> = {}) => {
     setIsSubmitting(true);
+    const previousStatus = violation.workflow_status;
+    
     try {
       const { error } = await supabase
         .from('violations')
@@ -109,6 +112,30 @@ export const QuickApprovalActions = ({ violation }: QuickApprovalActionsProps) =
         default:
           toast.success('Action completed successfully');
       }
+
+      // Trigger workflow notification
+      const departmentId = violation.students?.department_id;
+      let collegeId = '';
+      
+      // Get the college_id from the department
+      if (departmentId) {
+        const { data: deptData } = await supabase
+          .from('departments')
+          .select('college_id')
+          .eq('id', departmentId)
+          .single();
+        collegeId = deptData?.college_id || '';
+      }
+
+      triggerWorkflowNotification({
+        violation_id: violation.id,
+        new_status: data.workflow_status || violation.workflow_status,
+        previous_status: previousStatus,
+        triggered_by: user?.id || '',
+        student_name: studentName,
+        department_id: departmentId || '',
+        college_id: collegeId,
+      });
 
       queryClient.invalidateQueries({ queryKey: ['violations'] });
     } catch (error: any) {

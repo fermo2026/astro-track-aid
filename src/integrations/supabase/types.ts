@@ -103,6 +103,54 @@ export type Database = {
           },
         ]
       }
+      notifications: {
+        Row: {
+          created_at: string
+          id: string
+          is_read: boolean
+          message: string
+          title: string
+          type: Database["public"]["Enums"]["notification_type"]
+          user_id: string
+          violation_id: string | null
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          is_read?: boolean
+          message: string
+          title: string
+          type: Database["public"]["Enums"]["notification_type"]
+          user_id: string
+          violation_id?: string | null
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          is_read?: boolean
+          message?: string
+          title?: string
+          type?: Database["public"]["Enums"]["notification_type"]
+          user_id?: string
+          violation_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "notifications_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "notifications_violation_id_fkey"
+            columns: ["violation_id"]
+            isOneToOne: false
+            referencedRelation: "violations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       profiles: {
         Row: {
           avatar_url: string | null
@@ -397,6 +445,11 @@ export type Database = {
         | "Lab Exam"
         | "Re-exam"
         | "Makeup Exam"
+      notification_type:
+        | "case_submitted"
+        | "case_approved"
+        | "action_required"
+        | "decision_made"
       program_type: "BSc" | "MSc" | "PhD"
       violation_type:
         | "Cheating with Notes"
@@ -573,6 +626,12 @@ export const Constants = {
         "Lab Exam",
         "Re-exam",
         "Makeup Exam",
+      ],
+      notification_type: [
+        "case_submitted",
+        "case_approved",
+        "action_required",
+        "decision_made",
       ],
       program_type: ["BSc", "MSc", "PhD"],
       violation_type: [
