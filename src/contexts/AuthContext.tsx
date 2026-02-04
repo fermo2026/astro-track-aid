@@ -153,21 +153,19 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
   }, []);
 
   const signIn = async (email: string, password: string) => {
-    const { error } = await supabase.auth.signInWithPassword({
+    const { data, error } = await supabase.auth.signInWithPassword({
       email,
       password,
     });
     
-    if (!error) {
-      // Manually fetch user data after successful sign in
-      const { data: { session: newSession } } = await supabase.auth.getSession();
-      if (newSession?.user) {
-        setSession(newSession);
-        setUser(newSession.user);
-        const userData = await fetchUserData(newSession.user.id);
-        setProfile(userData.profile);
-        setRoles(userData.roles);
-      }
+    if (!error && data.session?.user) {
+      // Use the session returned directly from signIn - no need to call getSession again
+      setSession(data.session);
+      setUser(data.session.user);
+      // Fetch user data in parallel with state updates
+      const userData = await fetchUserData(data.session.user.id);
+      setProfile(userData.profile);
+      setRoles(userData.roles);
     }
     
     return { error };
