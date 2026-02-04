@@ -437,6 +437,17 @@ export type Database = {
         | "F Grade for Course"
         | "F Grade with Disciplinary Action"
         | "Referred to Discipline Committee"
+        | "F Grade with Academic Probation"
+        | "Verbal Warning"
+        | "Written Warning"
+        | "One Grade Deduction"
+        | "Referred to CMC"
+        | "Uphold DAC Decision"
+        | "Suspension (1 Semester)"
+        | "Suspension (2 Semesters)"
+        | "Suspension (1 Academic Year)"
+        | "Dismissal"
+        | "Referred to University Discipline Committee"
       exam_type:
         | "Mid Exam"
         | "Final Exam"
@@ -617,6 +628,17 @@ export const Constants = {
         "F Grade for Course",
         "F Grade with Disciplinary Action",
         "Referred to Discipline Committee",
+        "F Grade with Academic Probation",
+        "Verbal Warning",
+        "Written Warning",
+        "One Grade Deduction",
+        "Referred to CMC",
+        "Uphold DAC Decision",
+        "Suspension (1 Semester)",
+        "Suspension (2 Semesters)",
+        "Suspension (1 Academic Year)",
+        "Dismissal",
+        "Referred to University Discipline Committee",
       ],
       exam_type: [
         "Mid Exam",
