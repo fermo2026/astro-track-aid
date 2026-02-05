@@ -20,7 +20,7 @@ const navItems = [
   { icon: Users, label: 'Students', path: '/students' },
   { icon: BarChart3, label: 'Reports', path: '/reports' },
   { icon: Building2, label: 'Organization', path: '/departments' },
-  { icon: Shield, label: 'Users & Roles', path: '/users' },
+  { icon: Shield, label: 'User Management', path: '/users' },
   { icon: Settings, label: 'Settings', path: '/settings' },
 ];
 
