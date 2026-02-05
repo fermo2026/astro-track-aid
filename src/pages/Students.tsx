@@ -62,6 +62,7 @@ const Students = () => {
       if (error) throw error;
       return data;
     },
+    staleTime: 5 * 60 * 1000, // Cache for 5 minutes
   });
 
   const { data: studentsData, isLoading } = useQuery({
@@ -92,6 +93,7 @@ const Students = () => {
       if (error) throw error;
       return data;
     },
+    staleTime: 3 * 60 * 1000, // Cache for 3 minutes
   });
 
   // Filter by search query

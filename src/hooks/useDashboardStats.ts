@@ -37,38 +37,27 @@ export const useDashboardStats = () => {
       const startOfThisMonth = startOfMonth(now);
       const endOfThisMonth = endOfMonth(now);
 
-      // Get total violations
-      const { count: totalViolations } = await supabase
-        .from('violations')
-        .select('*', { count: 'exact', head: true });
-
-      // Get pending cases (DAC or CMC decision is Pending)
-      const { count: pendingCases } = await supabase
-        .from('violations')
-        .select('*', { count: 'exact', head: true })
-        .or('dac_decision.eq.Pending,cmc_decision.eq.Pending');
-
-      // Get resolved cases (both decisions are not Pending)
-      const { count: resolvedCases } = await supabase
-        .from('violations')
-        .select('*', { count: 'exact', head: true })
-        .neq('dac_decision', 'Pending')
-        .neq('cmc_decision', 'Pending');
-
-      // Get this month's violations
-      const { count: thisMonthViolations } = await supabase
-        .from('violations')
-        .select('*', { count: 'exact', head: true })
-        .gte('incident_date', format(startOfThisMonth, 'yyyy-MM-dd'))
-        .lte('incident_date', format(endOfThisMonth, 'yyyy-MM-dd'));
+      // Run all queries in parallel for better performance
+      const [totalResult, pendingResult, resolvedResult, thisMonthResult] = await Promise.all([
+        supabase.from('violations').select('*', { count: 'exact', head: true }),
+        supabase.from('violations').select('*', { count: 'exact', head: true })
+          .or('dac_decision.eq.Pending,cmc_decision.eq.Pending'),
+        supabase.from('violations').select('*', { count: 'exact', head: true })
+          .neq('dac_decision', 'Pending')
+          .neq('cmc_decision', 'Pending'),
+        supabase.from('violations').select('*', { count: 'exact', head: true })
+          .gte('incident_date', format(startOfThisMonth, 'yyyy-MM-dd'))
+          .lte('incident_date', format(endOfThisMonth, 'yyyy-MM-dd')),
+      ]);
 
       return {
-        totalViolations: totalViolations || 0,
-        pendingCases: pendingCases || 0,
-        resolvedCases: resolvedCases || 0,
-        thisMonthViolations: thisMonthViolations || 0,
+        totalViolations: totalResult.count || 0,
+        pendingCases: pendingResult.count || 0,
+        resolvedCases: resolvedResult.count || 0,
+        thisMonthViolations: thisMonthResult.count || 0,
       };
     },
+    staleTime: 5 * 60 * 1000, // Cache for 5 minutes
   });
 };
 
@@ -94,6 +83,7 @@ export const useDepartmentViolations = () => {
         .sort((a, b) => b.count - a.count)
         .slice(0, 7);
     },
+    staleTime: 5 * 60 * 1000, // Cache for 5 minutes
   });
 };
 
@@ -101,28 +91,28 @@ export const useMonthlyTrend = () => {
   return useQuery({
     queryKey: ['monthly-trend'],
     queryFn: async (): Promise<MonthlyTrend[]> => {
-      const months: MonthlyTrend[] = [];
       const now = new Date();
 
-      for (let i = 5; i >= 0; i--) {
-        const monthDate = subMonths(now, i);
+      // Create all promises in parallel instead of sequential loop
+      const monthPromises = Array.from({ length: 6 }, (_, i) => {
+        const monthDate = subMonths(now, 5 - i);
         const start = format(startOfMonth(monthDate), 'yyyy-MM-dd');
         const end = format(endOfMonth(monthDate), 'yyyy-MM-dd');
 
-        const { count } = await supabase
+        return supabase
           .from('violations')
           .select('*', { count: 'exact', head: true })
           .gte('incident_date', start)
-          .lte('incident_date', end);
+          .lte('incident_date', end)
+          .then(result => ({
+            month: format(monthDate, 'MMM'),
+            violations: result.count || 0,
+          }));
+      });
 
-        months.push({
-          month: format(monthDate, 'MMM'),
-          violations: count || 0,
-        });
-      }
-
-      return months;
+      return Promise.all(monthPromises);
     },
+    staleTime: 5 * 60 * 1000, // Cache for 5 minutes
   });
 };
 
@@ -146,6 +136,7 @@ export const useViolationTypes = () => {
         .map(([type, count]) => ({ type, count }))
         .sort((a, b) => b.count - a.count);
     },
+    staleTime: 5 * 60 * 1000, // Cache for 5 minutes
   });
 };
 
@@ -167,6 +158,7 @@ export const useExamTypes = () => {
 
       return Object.entries(typeCounts).map(([name, value]) => ({ name, value }));
     },
+    staleTime: 5 * 60 * 1000, // Cache for 5 minutes
   });
 };
 
@@ -189,5 +181,6 @@ export const useRecentViolations = () => {
       if (error) throw error;
       return data;
     },
+    staleTime: 2 * 60 * 1000, // Cache for 2 minutes
   });
 };

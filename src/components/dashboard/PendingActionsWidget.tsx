@@ -67,6 +67,7 @@ export const PendingActionsWidget = () => {
       return counts;
     },
     enabled: !!(isHead || isDeputy || isAVD || isSystemAdmin),
+    staleTime: 2 * 60 * 1000, // Cache for 2 minutes
   });
 
   // Build pending actions based on user role
