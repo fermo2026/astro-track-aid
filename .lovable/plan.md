@@ -1,185 +1,186 @@
 
-# Plan: Workflow Verification and Role-Based Notification System
+# Performance Optimization Plan
 
-## Summary
-This plan addresses two main areas: (1) fixing the AVD college assignment issue that prevents proper workflow functioning, and (2) implementing a comprehensive notification system that alerts each role when cases require their attention.
+## Issues Identified
+
+After analyzing the codebase, I found several performance bottlenecks causing slow page loads:
+
+### 1. Sequential Database Queries in `useMonthlyTrend` (Critical)
+**File:** `src/hooks/useDashboardStats.ts` (lines 100-127)
+
+The monthly trend hook makes **6 separate sequential database calls** inside a for loop:
+```typescript
+for (let i = 5; i >= 0; i--) {
+  const { count } = await supabase
+    .from('violations')
+    .select('*', { count: 'exact', head: true })
+    .gte('incident_date', start)
+    .lte('incident_date', end);
+}
+```
+This means 6 round trips to the server that must complete one after another.
+
+### 2. Multiple Independent API Calls Without Parallelization (Dashboard)
+The Dashboard page triggers **10+ separate queries** when loading:
+- `useDashboardStats` - 4 sequential queries
+- `useDepartmentViolations` - 1 query
+- `useMonthlyTrend` - 6 sequential queries  
+- `useViolationTypes` - 1 query
+- `useExamTypes` - 1 query
+- `useRecentViolations` - 1 query
+- `PendingActionsWidget` - 1 query
+
+### 3. Fetching Full Tables Instead of Counts
+Several queries fetch entire tables to count or process client-side:
+- `useDepartmentViolations` fetches all violations just to count by department
+- `useViolationTypes` fetches all violations to group by type
+- `useExamTypes` fetches all violations to group by exam type
+
+### 4. No Caching/Stale Time Configuration
+React Query defaults mean data refetches on every component mount without leveraging caching.
 
 ---
 
-## Current State Analysis
+## Optimization Strategy
 
-### Workflow Status
-The workflow has these states in order:
-- `draft` - Created by Deputy/Head
-- `submitted_to_head` - Awaiting Department Head approval
-- `approved_by_head` - Head approved, ready for AVD
-- `submitted_to_avd` - Submitted to Academic Vice Dean
-- `approved_by_avd` / `pending_cmc` - Awaiting CMC decision
-- `cmc_decided` - Final decision made
-- `closed` - Case completed
+### Phase 1: Fix Critical Sequential Queries
 
-### Issues Found
+**Update `useMonthlyTrend`:**
+- Replace the sequential for-loop with `Promise.all()` to fetch all 6 months in parallel
+- Reduces 6 sequential calls to 6 parallel calls (up to 5x faster)
 
-1. **AVD College Assignment Missing**
-   - The existing AVD user (`adaa.soeec@astu.edu.et`) has `college_id: null` in the `user_roles` table
-   - This prevents RLS policies from working correctly for college-level data access
-   - The AVD cannot see violations from departments within their college
+**Update `useDashboardStats`:**
+- Use `Promise.all()` to run all 4 count queries simultaneously
+- Reduces 4 sequential calls to 4 parallel calls
 
-2. **No Email Notifications**
-   - Only client-side toast notifications exist
-   - No system to notify the next role holder when a case moves to their queue
-   - College Dean and Registrar roles have no way to be notified of new cases
+### Phase 2: Optimize Data Fetching
 
-3. **Pending Actions Query**
-   - The AVD's pending actions widget cannot filter by college since college_id is null
-   - This affects the dashboard's "Pending Actions" counts
+**Create aggregated database queries:**
+- For violation type counts: Fetch and count in a single query with proper grouping
+- For exam type counts: Similar optimization
+- For department counts: Use proper SQL grouping instead of client-side processing
+
+### Phase 3: Add Proper Caching
+
+**Configure React Query with appropriate staleTime:**
+```typescript
+{
+  staleTime: 5 * 60 * 1000, // 5 minutes
+  gcTime: 10 * 60 * 1000,   // 10 minutes
+}
+```
+This prevents unnecessary refetches when navigating between pages.
 
 ---
 
-## Implementation Plan
+## Implementation Details
 
-### Phase 1: Fix AVD College Assignment (Database Fix)
+### File Changes
 
-**Action Required**: Update the existing AVD user role to include the correct college_id.
+**1. `src/hooks/useDashboardStats.ts`**
 
-```text
-SQL Migration:
-- UPDATE user_roles SET college_id = [CoEEC college ID] 
-  WHERE role = 'academic_vice_dean' AND college_id IS NULL
+Update `useDashboardStats`:
+```typescript
+export const useDashboardStats = () => {
+  return useQuery({
+    queryKey: ['dashboard-stats'],
+    queryFn: async (): Promise<DashboardStats> => {
+      const now = new Date();
+      const startOfThisMonth = startOfMonth(now);
+      const endOfThisMonth = endOfMonth(now);
+
+      // Run all queries in parallel
+      const [totalResult, pendingResult, resolvedResult, thisMonthResult] = await Promise.all([
+        supabase.from('violations').select('*', { count: 'exact', head: true }),
+        supabase.from('violations').select('*', { count: 'exact', head: true })
+          .or('dac_decision.eq.Pending,cmc_decision.eq.Pending'),
+        supabase.from('violations').select('*', { count: 'exact', head: true })
+          .neq('dac_decision', 'Pending').neq('cmc_decision', 'Pending'),
+        supabase.from('violations').select('*', { count: 'exact', head: true })
+          .gte('incident_date', format(startOfThisMonth, 'yyyy-MM-dd'))
+          .lte('incident_date', format(endOfThisMonth, 'yyyy-MM-dd')),
+      ]);
+
+      return {
+        totalViolations: totalResult.count || 0,
+        pendingCases: pendingResult.count || 0,
+        resolvedCases: resolvedResult.count || 0,
+        thisMonthViolations: thisMonthResult.count || 0,
+      };
+    },
+    staleTime: 5 * 60 * 1000, // Cache for 5 minutes
+  });
+};
 ```
 
-### Phase 2: Create Notification System
+Update `useMonthlyTrend`:
+```typescript
+export const useMonthlyTrend = () => {
+  return useQuery({
+    queryKey: ['monthly-trend'],
+    queryFn: async (): Promise<MonthlyTrend[]> => {
+      const now = new Date();
+      
+      // Create all promises in parallel
+      const monthPromises = Array.from({ length: 6 }, (_, i) => {
+        const monthDate = subMonths(now, 5 - i);
+        const start = format(startOfMonth(monthDate), 'yyyy-MM-dd');
+        const end = format(endOfMonth(monthDate), 'yyyy-MM-dd');
+        
+        return supabase
+          .from('violations')
+          .select('*', { count: 'exact', head: true })
+          .gte('incident_date', start)
+          .lte('incident_date', end)
+          .then(result => ({
+            month: format(monthDate, 'MMM'),
+            violations: result.count || 0,
+          }));
+      });
 
-#### 2.1 Create Notifications Table
-Create a database table to store in-app notifications:
-
-```text
-Table: notifications
-- id (uuid, primary key)
-- user_id (uuid, references profiles)
-- type (enum: 'case_submitted', 'case_approved', 'action_required', 'decision_made')
-- title (text)
-- message (text)
-- violation_id (uuid, optional reference)
-- is_read (boolean, default false)
-- created_at (timestamp)
+      return Promise.all(monthPromises);
+    },
+    staleTime: 5 * 60 * 1000,
+  });
+};
 ```
 
-#### 2.2 Create Notification Edge Function
-Build an edge function to send notifications when workflow status changes:
+Add caching to all other hooks:
+- `useDepartmentViolations`: Add `staleTime: 5 * 60 * 1000`
+- `useViolationTypes`: Add `staleTime: 5 * 60 * 1000`
+- `useExamTypes`: Add `staleTime: 5 * 60 * 1000`
+- `useRecentViolations`: Add `staleTime: 2 * 60 * 1000`
 
-```text
-Edge Function: send-workflow-notification
-- Triggered after violation status update
-- Determines which users need to be notified based on new status
-- Creates notification records for appropriate role holders
-- Optionally sends email notifications (future enhancement)
-```
+**2. `src/pages/Students.tsx`**
+Add caching for student and department queries.
 
-#### 2.3 Implement Notification Triggers
+**3. `src/pages/Violations.tsx`**
+Add caching for violation queries.
 
-| Workflow Transition | Notify |
-|---------------------|--------|
-| Draft -> Submitted to Head | Department Head(s) in same department |
-| Submitted to Head -> Approved by Head | Deputy (confirmation), AVD in college |
-| Approved by Head -> Submitted to AVD | AVD in college |
-| Any change to CMC Decided | College Dean, College Registrar, Department Head, Deputy |
+**4. `src/pages/UsersRoles.tsx`**
+Add caching for user-related queries.
 
-#### 2.4 Add Notification UI Components
-- Create a notification dropdown/bell icon in the header
-- Show unread notification count badge
-- List of recent notifications with links to relevant cases
-- Mark as read functionality
-
-### Phase 3: Enhanced Pending Actions
-
-#### 3.1 Update PendingActionsWidget for AVD
-Fix the query to properly filter by college when the user is an AVD:
-
-```text
-- Fetch the AVD's college_id from their role
-- Query violations where student's department belongs to AVD's college
-- Group by workflow_status
-```
-
-#### 3.2 Add Real-time Updates
-Enable real-time subscription for notifications table so users see new notifications immediately without refresh.
+**5. `src/components/dashboard/PendingActionsWidget.tsx`**
+Add caching for pending actions query.
 
 ---
 
-## Technical Implementation Details
+## Expected Performance Improvements
 
-### Database Changes
-1. Create `notifications` table with RLS policies
-2. Create notification type enum
-3. Add database trigger or edge function hook for workflow changes
+| Metric | Before | After |
+|--------|--------|-------|
+| Dashboard initial load | ~10 sequential queries | 6 parallel batches |
+| Monthly trend data | 6 sequential calls (~600ms+) | 6 parallel calls (~100ms) |
+| Stats counts | 4 sequential calls (~400ms+) | 4 parallel calls (~100ms) |
+| Page navigation | Full refetch every time | Cached data, instant render |
 
-### New Files to Create
-- `supabase/functions/send-workflow-notification/index.ts`
-- `src/components/notifications/NotificationBell.tsx`
-- `src/components/notifications/NotificationList.tsx`
-- `src/hooks/useNotifications.ts`
-
-### Files to Modify
-- `src/components/layout/Header.tsx` - Add notification bell
-- `src/components/dashboard/PendingActionsWidget.tsx` - Fix AVD college filtering
-- `src/components/violations/QuickApprovalActions.tsx` - Trigger notifications
-- `src/components/violations/WorkflowActions.tsx` - Trigger notifications
+**Overall improvement: 3-5x faster page loads**
 
 ---
 
-## Notification Flow Diagram
+## Technical Notes
 
-```text
-                    +------------------+
-                    |   Deputy/Head    |
-                    |  Creates Draft   |
-                    +--------+---------+
-                             |
-                             v
-                    +------------------+
-                    | Submit to Head   |-----> Notify: Department Head
-                    +--------+---------+
-                             |
-                             v
-                    +------------------+
-                    |  Head Approves   |-----> Notify: Deputy (confirmation)
-                    | Sets DAC Decision|-----> Notify: AVD (action needed)
-                    +--------+---------+
-                             |
-                             v
-                    +------------------+
-                    |  Submit to AVD   |-----> Notify: AVD (reminder)
-                    +--------+---------+
-                             |
-                             v
-                    +------------------+
-                    |   AVD Approves   |
-                    | Sets CMC Decision|-----> Notify: All stakeholders
-                    +------------------+             - Department Head
-                                                     - Deputy
-                                                     - College Dean
-                                                     - College Registrar
-```
-
----
-
-## Priority Order
-
-1. **Critical**: Fix AVD college_id assignment (database update)
-2. **High**: Create notifications table and basic notification creation
-3. **High**: Add notification UI to header
-4. **Medium**: Implement real-time notification updates
-5. **Low**: Add email notification capability (future enhancement)
-
----
-
-## Expected Outcomes
-
-After implementation:
-- AVD will properly see all violations from departments in their college
-- Each role holder will receive in-app notifications when cases require their attention
-- The dashboard's pending actions will accurately reflect items for each role
-- College Dean and Registrar will be notified of CMC decisions in their college
-- All workflow transitions will be tracked and communicated
-
+- All changes use the existing Supabase client and React Query infrastructure
+- No new dependencies required
+- Backward compatible with existing data structures
+- Error handling remains consistent with current patterns
