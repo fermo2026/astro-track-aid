@@ -191,6 +191,7 @@ const Violations = () => {
       if (error) throw error;
       return data;
     },
+    staleTime: 5 * 60 * 1000, // Cache for 5 minutes
   });
 
   const { data: violations, isLoading } = useQuery({
@@ -228,6 +229,7 @@ const Violations = () => {
       if (error) throw error;
       return data;
     },
+    staleTime: 2 * 60 * 1000, // Cache for 2 minutes
   });
 
   const filteredViolations = violations?.filter((v: any) => {

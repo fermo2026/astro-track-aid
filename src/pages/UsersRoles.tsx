@@ -116,6 +116,7 @@ const UsersRoles = () => {
       })) || [];
     },
     enabled: isSystemAdmin,
+    staleTime: 3 * 60 * 1000, // Cache for 3 minutes
   });
 
   return (
