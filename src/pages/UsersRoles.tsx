@@ -123,9 +123,9 @@ const UsersRoles = () => {
       <div className="space-y-6 animate-fade-in">
         <div className="flex items-center justify-between">
           <div>
-            <h1 className="text-3xl font-bold text-foreground">Users & Roles</h1>
+            <h1 className="text-3xl font-bold text-foreground">User Management</h1>
             <p className="text-muted-foreground mt-1">
-              Role-based access control and user management
+              Manage system users and access
             </p>
           </div>
           {isSystemAdmin && <InviteUserForm onSuccess={() => refetch()} />}
@@ -206,45 +206,6 @@ const UsersRoles = () => {
             currentUserId={user?.id || ''}
           />
         )}
-
-        {/* Role Hierarchy */}
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <Shield className="h-5 w-5 text-primary" />
-              Role Hierarchy
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-4">
-              {roles.map((role, index) => (
-                <div 
-                  key={role.value}
-                  className="flex items-start gap-4 p-4 rounded-lg border border-border bg-card hover:bg-muted/50 transition-colors"
-                  style={{ marginLeft: `${index * 16}px` }}
-                >
-                  <div className="flex items-center justify-center h-10 w-10 rounded-full bg-primary/10 text-primary font-bold">
-                    {role.level}
-                  </div>
-                  <div className="flex-1">
-                    <div className="flex items-center gap-2">
-                      <h3 className="font-semibold text-foreground">{role.name}</h3>
-                      <Badge variant="outline" className="text-xs">Level {role.level}</Badge>
-                    </div>
-                    <p className="text-sm text-muted-foreground mt-1">{role.description}</p>
-                    <div className="flex flex-wrap gap-2 mt-2">
-                      {role.permissions.map((permission) => (
-                        <Badge key={permission} variant="secondary" className="text-xs">
-                          {permission}
-                        </Badge>
-                      ))}
-                    </div>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </CardContent>
-        </Card>
 
         {!isSystemAdmin && (
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
