@@ -34,7 +34,8 @@ import {
 } from '@/components/ui/dialog';
 import { supabase } from '@/integrations/supabase/client';
 import { ExportButton } from '@/components/export/ExportButton';
-import { Loader2, FileText } from 'lucide-react';
+import { FileText } from 'lucide-react';
+import { TableSkeleton } from '@/components/ui/table-skeleton';
 import { cn } from '@/lib/utils';
 import { useAuth } from '@/contexts/AuthContext';
 import { useAcademicSettings } from '@/hooks/useAcademicSettings';
@@ -314,9 +315,7 @@ const Violations = () => {
         <Card>
           <CardContent className="p-0">
             {isLoading ? (
-              <div className="flex items-center justify-center py-20">
-                <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
-              </div>
+              <TableSkeleton columns={7} rows={8} columnWidths={['w-32', 'w-12', 'w-28', 'w-16', 'w-20', 'w-20', 'w-16']} />
             ) : filteredViolations && filteredViolations.length > 0 ? (
               <div className="overflow-x-auto">
                 <Table>
