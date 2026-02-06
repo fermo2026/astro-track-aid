@@ -19,7 +19,8 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { Users, Loader2, Search, AlertTriangle } from 'lucide-react';
+import { Users, Search, AlertTriangle } from 'lucide-react';
+import { TableSkeleton } from '@/components/ui/table-skeleton';
 import { supabase } from '@/integrations/supabase/client';
 import { ImportDialog } from '@/components/import/ImportDialog';
 import { ExportButton } from '@/components/export/ExportButton';
@@ -199,9 +200,7 @@ const Students = () => {
         <Card>
           <CardContent className="p-0">
             {isLoading ? (
-              <div className="flex items-center justify-center py-20">
-                <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
-              </div>
+              <TableSkeleton columns={5} rows={8} columnWidths={['w-20', 'w-32', 'w-16', 'w-12', 'w-12']} />
             ) : paginatedStudents.length > 0 ? (
               <>
                 <Table>

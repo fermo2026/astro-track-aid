@@ -1,7 +1,8 @@
 import { useQuery } from '@tanstack/react-query';
 import { MainLayout } from '@/components/layout/MainLayout';
 import { Card, CardContent } from '@/components/ui/card';
-import { Building2, GraduationCap, Loader2 } from 'lucide-react';
+import { Building2, GraduationCap } from 'lucide-react';
+import { TableSkeleton } from '@/components/ui/table-skeleton';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { CollegeForm } from '@/components/colleges/CollegeForm';
@@ -88,9 +89,7 @@ const Departments = () => {
             <Card>
               <CardContent className="p-0">
                 {isLoading ? (
-                  <div className="flex items-center justify-center py-10">
-                    <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
-                  </div>
+                  <TableSkeleton columns={4} rows={5} columnWidths={['w-40', 'w-16', 'w-32', 'w-16']} />
                 ) : departments && departments.length > 0 ? (
                   <Table>
                     <TableHeader>
@@ -158,9 +157,7 @@ const Departments = () => {
             <Card>
               <CardContent className="p-0">
                 {isLoading ? (
-                  <div className="flex items-center justify-center py-10">
-                    <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
-                  </div>
+                  <TableSkeleton columns={3} rows={4} columnWidths={['w-40', 'w-16', 'w-20']} />
                 ) : colleges && colleges.length > 0 ? (
                   <Table>
                     <TableHeader>

@@ -10,7 +10,8 @@ import { ReportCharts } from '@/components/reports/ReportCharts';
 import { ExportButton } from '@/components/export/ExportButton';
 import { useReportData, useReportSummary, ReportFilters as ReportFiltersType } from '@/hooks/useReportData';
 import { supabase } from '@/integrations/supabase/client';
-import { Loader2, FileText, BarChart3, Table } from 'lucide-react';
+import { FileText, BarChart3, Table } from 'lucide-react';
+import { TableSkeleton } from '@/components/ui/table-skeleton';
 import { format } from 'date-fns';
 
 const defaultFilters: ReportFiltersType = {
@@ -130,8 +131,8 @@ const Reports = () => {
           </TabsList>
 
           {isLoading ? (
-            <div className="flex items-center justify-center py-12">
-              <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+            <div className="mt-6">
+              <TableSkeleton columns={10} rows={6} columnWidths={['w-28', 'w-20', 'w-16', 'w-20', 'w-24', 'w-16', 'w-20', 'w-20', 'w-20', 'w-16']} />
             </div>
           ) : (
             <>

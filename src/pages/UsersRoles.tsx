@@ -3,7 +3,8 @@ import { MainLayout } from '@/components/layout/MainLayout';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Shield, UserCheck, Users, Loader2, Pencil } from 'lucide-react';
+import { Shield, UserCheck, Users, Pencil } from 'lucide-react';
+import { TableSkeleton } from '@/components/ui/table-skeleton';
 import { useAuth } from '@/contexts/AuthContext';
 import { InviteUserForm } from '@/components/users/InviteUserForm';
 import { UserEditDialog } from '@/components/users/UserEditDialog';
@@ -143,9 +144,7 @@ const UsersRoles = () => {
             </CardHeader>
             <CardContent>
               {usersLoading ? (
-                <div className="flex items-center justify-center py-8">
-                  <Loader2 className="h-6 w-6 animate-spin text-primary" />
-                </div>
+                <TableSkeleton columns={4} rows={5} columnWidths={['w-32', 'w-40', 'w-24', 'w-16']} />
               ) : users && users.length > 0 ? (
                 <Table>
                   <TableHeader>
