@@ -61,12 +61,16 @@ export const QuickApprovalActions = ({ violation }: QuickApprovalActionsProps) =
   const canApproveAsHead = isHead && status === 'submitted_to_head';
   const canSubmitToAVD = isHead && status === 'approved_by_head';
   const canApproveAsAVD = isAVD && (status === 'submitted_to_avd' || status === 'approved_by_head');
+  // AVD can set DAC decision on any record where DAC is still Pending (bypasses normal workflow)
+  const canSetDACDecision = isAVD && violation.dac_decision === 'Pending' && status !== 'cmc_decided' && status !== 'closed';
   const canSetCMCDecision = isAVD && 
     (status === 'approved_by_avd' || status === 'pending_cmc' || 
-     status === 'submitted_to_avd' || status === 'approved_by_head');
+     status === 'submitted_to_avd' || status === 'approved_by_head' ||
+     // AVD can also set CMC once they've set DAC decision
+     (violation.dac_decision !== 'Pending' && status !== 'cmc_decided' && status !== 'closed'));
   
   // No action available
-  const noAction = !canSubmitToHead && !canApproveAsHead && !canSubmitToAVD && !canApproveAsAVD && !canSetCMCDecision;
+  const noAction = !canSubmitToHead && !canApproveAsHead && !canSubmitToAVD && !canApproveAsAVD && !canSetDACDecision && !canSetCMCDecision;
 
   const handleQuickAction = async (action: string, data: Record<string, any> = {}) => {
     setIsSubmitting(true);
@@ -269,8 +273,8 @@ export const QuickApprovalActions = ({ violation }: QuickApprovalActionsProps) =
     );
   }
 
-  // AVD Approval + CMC Decision
-  if (canApproveAsAVD || canSetCMCDecision) {
+  // AVD sets DAC Decision directly (bypassing head approval)
+  if (canSetDACDecision && !canSetCMCDecision) {
     const isRepeat = repeatInfo?.isRepeatOffender || violation.is_repeat_offender;
     
     return (
@@ -279,13 +283,13 @@ export const QuickApprovalActions = ({ violation }: QuickApprovalActionsProps) =
           <Button size="sm" className={`h-7 text-xs ${isRepeat ? 'bg-destructive hover:bg-destructive/90' : 'bg-primary'}`}>
             {isRepeat && <AlertTriangle className="h-3 w-3 mr-1" />}
             <Gavel className="h-3 w-3 mr-1" />
-            CMC Decision
+            DAC Decision
             <ChevronDown className="h-3 w-3 ml-1" />
           </Button>
         </DropdownMenuTrigger>
-        <DropdownMenuContent align="end" className="w-72">
+        <DropdownMenuContent align="end" className="w-64">
           <DropdownMenuLabel className="flex items-center gap-2">
-            Final CMC Decision
+            Set DAC Decision (AVD Authority)
             {isRepeat && repeatInfo && (
               <Badge variant="destructive" className="text-[10px]">
                 {repeatInfo.priorViolationCount} Prior
@@ -295,25 +299,25 @@ export const QuickApprovalActions = ({ violation }: QuickApprovalActionsProps) =
           {isRepeat && repeatInfo && (
             <>
               <div className="px-2 py-1.5 text-xs text-muted-foreground bg-muted/50 mx-1 rounded">
-                ⭐ Suggested: {repeatInfo.suggestedCMCDecision}
+                ⭐ Suggested: {repeatInfo.suggestedDACDecision}
               </div>
               <DropdownMenuSeparator />
             </>
           )}
           <DropdownMenuSeparator />
-          {cmcDecisionOptions.filter(d => d !== 'Pending').map((decision) => {
-            const isSuggested = isRepeat && repeatInfo?.suggestedCMCDecision === decision;
+          {dacDecisionOptions.filter(d => d !== 'Pending').map((decision) => {
+            const isSuggested = isRepeat && repeatInfo?.suggestedDACDecision === decision;
             return (
               <DropdownMenuItem
                 key={decision}
                 className={isSuggested ? 'bg-warning/20 font-medium' : ''}
-                onClick={() => handleQuickAction('cmc_decision', {
-                  workflow_status: 'cmc_decided',
-                  cmc_decision: decision,
-                  cmc_decision_by: user?.id,
-                  cmc_decision_date: new Date().toISOString().split('T')[0],
-                  approved_by_avd: user?.id,
-                  avd_approved_at: new Date().toISOString(),
+                onClick={() => handleQuickAction('approve_head', {
+                  workflow_status: 'approved_by_head',
+                  dac_decision: decision,
+                  dac_decision_by: user?.id,
+                  dac_decision_date: new Date().toISOString().split('T')[0],
+                  approved_by_head: user?.id,
+                  head_approved_at: new Date().toISOString(),
                 })}
               >
                 <span className="flex items-center gap-2">
@@ -325,6 +329,97 @@ export const QuickApprovalActions = ({ violation }: QuickApprovalActionsProps) =
           })}
         </DropdownMenuContent>
       </DropdownMenu>
+    );
+  }
+
+  // AVD Approval + CMC Decision (also shows DAC if both available)
+  if (canApproveAsAVD || canSetCMCDecision) {
+    const isRepeat = repeatInfo?.isRepeatOffender || violation.is_repeat_offender;
+    
+    return (
+      <div className="flex gap-1">
+        {canSetDACDecision && (
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button size="sm" variant="outline" className="h-7 text-xs">
+                <Gavel className="h-3 w-3 mr-1" />
+                DAC
+                <ChevronDown className="h-3 w-3 ml-1" />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" className="w-64">
+              <DropdownMenuLabel>Set DAC Decision</DropdownMenuLabel>
+              <DropdownMenuSeparator />
+              {dacDecisionOptions.filter(d => d !== 'Pending').map((decision) => (
+                <DropdownMenuItem
+                  key={decision}
+                  onClick={() => handleQuickAction('approve_head', {
+                    workflow_status: 'approved_by_head',
+                    dac_decision: decision,
+                    dac_decision_by: user?.id,
+                    dac_decision_date: new Date().toISOString().split('T')[0],
+                    approved_by_head: user?.id,
+                    head_approved_at: new Date().toISOString(),
+                  })}
+                >
+                  {decision}
+                </DropdownMenuItem>
+              ))}
+            </DropdownMenuContent>
+          </DropdownMenu>
+        )}
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <Button size="sm" className={`h-7 text-xs ${isRepeat ? 'bg-destructive hover:bg-destructive/90' : 'bg-primary'}`}>
+              {isRepeat && <AlertTriangle className="h-3 w-3 mr-1" />}
+              <Gavel className="h-3 w-3 mr-1" />
+              CMC Decision
+              <ChevronDown className="h-3 w-3 ml-1" />
+            </Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end" className="w-72">
+            <DropdownMenuLabel className="flex items-center gap-2">
+              Final CMC Decision
+              {isRepeat && repeatInfo && (
+                <Badge variant="destructive" className="text-[10px]">
+                  {repeatInfo.priorViolationCount} Prior
+                </Badge>
+              )}
+            </DropdownMenuLabel>
+            {isRepeat && repeatInfo && (
+              <>
+                <div className="px-2 py-1.5 text-xs text-muted-foreground bg-muted/50 mx-1 rounded">
+                  ⭐ Suggested: {repeatInfo.suggestedCMCDecision}
+                </div>
+                <DropdownMenuSeparator />
+              </>
+            )}
+            <DropdownMenuSeparator />
+            {cmcDecisionOptions.filter(d => d !== 'Pending').map((decision) => {
+              const isSuggested = isRepeat && repeatInfo?.suggestedCMCDecision === decision;
+              return (
+                <DropdownMenuItem
+                  key={decision}
+                  className={isSuggested ? 'bg-warning/20 font-medium' : ''}
+                  onClick={() => handleQuickAction('cmc_decision', {
+                    workflow_status: 'cmc_decided',
+                    cmc_decision: decision,
+                    cmc_decision_by: user?.id,
+                    cmc_decision_date: new Date().toISOString().split('T')[0],
+                    approved_by_avd: user?.id,
+                    avd_approved_at: new Date().toISOString(),
+                  })}
+                >
+                  <span className="flex items-center gap-2">
+                    {isSuggested && <Star className="h-3 w-3 fill-warning text-warning" />}
+                    {decision}
+                  </span>
+                </DropdownMenuItem>
+              );
+            })}
+          </DropdownMenuContent>
+        </DropdownMenu>
+      </div>
     );
   }
 
