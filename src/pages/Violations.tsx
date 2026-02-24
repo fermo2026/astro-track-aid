@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Search, Eye, AlertTriangle, Calendar } from 'lucide-react';
+import { Search, Eye, AlertTriangle, Calendar, Trash2, Loader2 } from 'lucide-react';
 import { useQuery } from '@tanstack/react-query';
 import { MainLayout } from '@/components/layout/MainLayout';
 import { ViolationDialog } from '@/components/violations/ViolationDialog';
@@ -32,6 +32,18 @@ import {
   DialogTitle,
   DialogTrigger,
 } from '@/components/ui/dialog';
+import {
+  AlertDialog,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from '@/components/ui/alert-dialog';
+import { useQueryClient } from '@tanstack/react-query';
+import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
 import { ExportButton } from '@/components/export/ExportButton';
 import { FileText } from 'lucide-react';
@@ -181,6 +193,25 @@ const Violations = () => {
   
   const canAddViolation = isAVD || ((isHead || isDeputy) && userDepartmentId);
   const canSeeCMC = isSystemAdmin || isAVD;
+  const queryClient = useQueryClient();
+  const [deletingId, setDeletingId] = useState<string | null>(null);
+
+  const handleDeleteViolation = async (violationId: string) => {
+    setDeletingId(violationId);
+    try {
+      const { error } = await supabase
+        .from('violations')
+        .delete()
+        .eq('id', violationId);
+      if (error) throw error;
+      toast.success('Violation record deleted successfully');
+      queryClient.invalidateQueries({ queryKey: ['violations'] });
+    } catch (error: any) {
+      toast.error(error.message || 'Failed to delete violation');
+    } finally {
+      setDeletingId(null);
+    }
+  };
 
   const { data: departments } = useQuery({
     queryKey: ['departments'],
@@ -396,14 +427,51 @@ const Violations = () => {
                           <QuickApprovalActions violation={v} />
                         </TableCell>
                         <TableCell className="py-2">
-                          <ViolationDetailDialog
-                            violation={v}
-                            trigger={
-                              <Button variant="ghost" size="icon" className="h-7 w-7">
-                                <Eye className="h-4 w-4 text-muted-foreground" />
-                              </Button>
-                            }
-                          />
+                          <div className="flex items-center gap-1">
+                            <ViolationDetailDialog
+                              violation={v}
+                              trigger={
+                                <Button variant="ghost" size="icon" className="h-7 w-7">
+                                  <Eye className="h-4 w-4 text-muted-foreground" />
+                                </Button>
+                              }
+                            />
+                            {isSystemAdmin && (
+                              <AlertDialog>
+                                <AlertDialogTrigger asChild>
+                                  <Button variant="ghost" size="icon" className="h-7 w-7 text-destructive hover:text-destructive hover:bg-destructive/10">
+                                    <Trash2 className="h-4 w-4" />
+                                  </Button>
+                                </AlertDialogTrigger>
+                                <AlertDialogContent>
+                                  <AlertDialogHeader>
+                                    <AlertDialogTitle>Delete Violation Record</AlertDialogTitle>
+                                    <AlertDialogDescription>
+                                      Are you sure you want to delete this violation record for <strong>{v.students?.full_name}</strong> ({v.students?.student_id})?
+                                      This action cannot be undone.
+                                    </AlertDialogDescription>
+                                  </AlertDialogHeader>
+                                  <AlertDialogFooter>
+                                    <AlertDialogCancel>Cancel</AlertDialogCancel>
+                                    <Button
+                                      onClick={() => handleDeleteViolation(v.id)}
+                                      disabled={deletingId === v.id}
+                                      className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                                    >
+                                      {deletingId === v.id ? (
+                                        <>
+                                          <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                                          Deleting...
+                                        </>
+                                      ) : (
+                                        'Delete'
+                                      )}
+                                    </Button>
+                                  </AlertDialogFooter>
+                                </AlertDialogContent>
+                              </AlertDialog>
+                            )}
+                          </div>
                         </TableCell>
                       </TableRow>
                     ))}
