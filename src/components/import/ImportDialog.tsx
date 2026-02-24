@@ -126,6 +126,7 @@ export const ImportDialog = ({ type, onSuccess }: ImportDialogProps) => {
   // Check if user is AVD
   const isAVD = roles.some(r => r.role === 'academic_vice_dean');
   const avdCollegeId = roles.find(r => r.role === 'academic_vice_dean')?.college_id;
+  // AVD no longer selects a department manually — department_code from CSV is used
 
   // Fetch existing data for duplicate detection
   const { data: existingStudents } = useQuery({
@@ -223,13 +224,24 @@ export const ImportDialog = ({ type, onSuccess }: ImportDialogProps) => {
         continue;
       }
 
-      // Check department - if AVD selected one, use that instead of CSV
-      if (!isAVD && deptCode && !deptMap.has(deptCode.toLowerCase())) {
+      // Check department code exists
+      if (deptCode && !deptMap.has(deptCode.toLowerCase())) {
         results.push({
           row: i + 2,
           data,
           status: 'warning',
           message: `Department "${deptCode}" not found`,
+        });
+        continue;
+      }
+
+      // AVD: department_code is required so students are organized under correct department
+      if (isAVD && !deptCode) {
+        results.push({
+          row: i + 2,
+          data,
+          status: 'error',
+          message: 'Department code is required for AVD imports',
         });
         continue;
       }
@@ -261,11 +273,7 @@ export const ImportDialog = ({ type, onSuccess }: ImportDialogProps) => {
       return;
     }
 
-    // AVD must select a department for student imports
-    if (type === 'students' && isAVD && !selectedDepartmentId) {
-      setError('Please select a department for the students');
-      return;
-    }
+    // No department selection needed for AVD — detected from CSV
 
     setIsValidating(true);
     setError(null);
@@ -325,10 +333,8 @@ export const ImportDialog = ({ type, onSuccess }: ImportDialogProps) => {
     const students = validRows.map((rowIdx) => {
       const row = rows[rowIdx];
       
-      // For AVD, use the selected department; otherwise use CSV department_code
-      const departmentId = isAVD && selectedDepartmentId 
-        ? selectedDepartmentId 
-        : deptMap.get(row[deptCodeIdx]?.toLowerCase().trim()) || null;
+      // Always use department_code from CSV to resolve department
+      const departmentId = deptMap.get(row[deptCodeIdx]?.toLowerCase().trim()) || null;
       
       return {
         student_id: row[studentIdIdx]?.trim(),
@@ -444,8 +450,8 @@ export const ImportDialog = ({ type, onSuccess }: ImportDialogProps) => {
   const errorCount = validationResults.filter(r => r.status === 'error').length;
   const canImport = (validCount + duplicateCount) > 0 && errorCount === 0;
 
-  // For AVD importing students, show department selector
-  const showDepartmentSelector = type === 'students' && isAVD;
+  // AVD no longer needs a department selector — auto-detected from CSV
+  const showDepartmentSelector = false;
 
   return (
     <Dialog open={open} onOpenChange={(o) => { if (!o) resetDialog(); else setOpen(o); }}>
@@ -464,9 +470,9 @@ export const ImportDialog = ({ type, onSuccess }: ImportDialogProps) => {
             {step === 'upload' 
               ? `Upload a CSV file to import ${type}. Download the template first to see the required format.`
               : 'Review the validation results before importing.'}
-            {showDepartmentSelector && step === 'upload' && (
+            {type === 'students' && isAVD && step === 'upload' && (
               <span className="block mt-1 text-primary font-medium">
-                As AVD, select the department where these students will be added.
+                Departments will be automatically detected from the department_code column in your CSV.
               </span>
             )}
           </DialogDescription>
@@ -536,11 +542,11 @@ export const ImportDialog = ({ type, onSuccess }: ImportDialogProps) => {
           </div>
         ) : (
           <div className="space-y-4">
-            {/* Show selected department for AVD */}
-            {showDepartmentSelector && selectedDepartmentId && (
+            {/* Show auto-detection info for AVD */}
+            {type === 'students' && isAVD && (
               <Alert>
                 <AlertDescription>
-                  Students will be imported to: <strong>{departments?.find(d => d.id === selectedDepartmentId)?.name}</strong>
+                  Students will be organized under their respective departments based on the <strong>department_code</strong> column.
                 </AlertDescription>
               </Alert>
             )}
@@ -621,7 +627,7 @@ export const ImportDialog = ({ type, onSuccess }: ImportDialogProps) => {
             Cancel
           </Button>
           {step === 'upload' ? (
-            <Button onClick={handleValidate} disabled={!file || isValidating || (showDepartmentSelector && !selectedDepartmentId)}>
+            <Button onClick={handleValidate} disabled={!file || isValidating}>
               {isValidating && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
               <Eye className="h-4 w-4 mr-2" />
               Validate & Review
