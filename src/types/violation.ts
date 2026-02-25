@@ -1,12 +1,19 @@
 export type ExamType = 'Mid Exam' | 'Final Exam';
 
 export type ViolationType = 
-  | 'Cheating with Notes'
+  | 'Possession of Unauthorized Materials'
   | 'Copying from Another Student'
+  | 'Allowing Another to Copy'
   | 'Using Electronic Device'
+  | 'Communicating with Other Students'
   | 'Impersonation'
-  | 'Collaboration'
+  | 'Bringing Unauthorized Person'
+  | 'Leaving Exam Room Unauthorized'
   | 'Plagiarism'
+  | 'Fabrication of Data'
+  | 'Tampering with Exam Materials'
+  | 'Cheating with Notes'
+  | 'Collaboration'
   | 'Other';
 
 export type DecisionStatus = 
