@@ -144,21 +144,24 @@ export const ViolationDialog = ({ onSuccess }: ViolationDialogProps) => {
   });
 
   // Determine which department to filter students by
-  const effectiveDepartmentId = isAVD ? selectedDepartmentId : userDepartmentId;
+  // AVD searches across all college departments (no manual selection needed)
+  const effectiveDepartmentId = isAVD ? null : userDepartmentId;
 
-  // Fetch students - AVD must select department first, then search within that department
+  // Fetch students - AVD searches across all college departments, others search their own
   const { data: students, isLoading: studentsLoading } = useQuery({
-    queryKey: ['students-search', studentSearch, effectiveDepartmentId, isAVD],
+    queryKey: ['students-search', studentSearch, effectiveDepartmentId, isAVD, collegeDepartments],
     queryFn: async () => {
       let query = supabase
         .from('students')
-        .select('id, student_id, full_name, departments(name)')
+        .select('id, student_id, full_name, department_id, departments(name)')
         .or(`full_name.ilike.%${studentSearch}%,student_id.ilike.%${studentSearch}%`)
         .order('full_name')
         .limit(10);
       
-      // Filter by the effective department (selected by AVD or user's own department)
-      if (effectiveDepartmentId) {
+      if (isAVD && collegeDepartments && collegeDepartments.length > 0) {
+        // AVD: filter to students in any department of their college
+        query = query.in('department_id', collegeDepartments);
+      } else if (effectiveDepartmentId) {
         query = query.eq('department_id', effectiveDepartmentId);
       }
 
@@ -166,7 +169,7 @@ export const ViolationDialog = ({ onSuccess }: ViolationDialogProps) => {
       if (error) throw error;
       return data;
     },
-    enabled: open && studentSearch.length >= 2 && !!effectiveDepartmentId,
+    enabled: open && studentSearch.length >= 2 && (isAVD ? (collegeDepartments && collegeDepartments.length > 0) : !!effectiveDepartmentId),
   });
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -296,34 +299,13 @@ export const ViolationDialog = ({ onSuccess }: ViolationDialogProps) => {
         )}
 
         <form onSubmit={handleSubmit} className="space-y-6">
-          {/* AVD Department Selection */}
+          {/* AVD info - department auto-detected from student */}
           {isAVD && (
-            <div className="space-y-2">
-              <Label>Department *</Label>
-              <Select
-                value={selectedDepartmentId}
-                onValueChange={(v) => {
-                  setSelectedDepartmentId(v);
-                  // Clear student selection when department changes
-                  setSelectedStudent(null);
-                  setStudentSearch('');
-                }}
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder="Select department first" />
-                </SelectTrigger>
-                <SelectContent>
-                  {avdDepartments?.map((dept) => (
-                    <SelectItem key={dept.id} value={dept.id}>
-                      {dept.name} ({dept.code})
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-              <p className="text-xs text-muted-foreground">
-                As AVD, select the department to search for students
-              </p>
-            </div>
+            <Alert>
+              <AlertDescription className="text-sm">
+                Department will be automatically assigned based on the selected student's information.
+              </AlertDescription>
+            </Alert>
           )}
 
           {/* Student Selection */}
@@ -372,52 +354,41 @@ export const ViolationDialog = ({ onSuccess }: ViolationDialogProps) => {
               </div>
             ) : (
               <div className="relative">
-                {/* Show message if AVD hasn't selected department */}
-                {isAVD && !selectedDepartmentId ? (
-                  <div className="p-3 bg-muted rounded-lg text-center">
-                    <p className="text-sm text-muted-foreground">
-                      Please select a department above to search for students
-                    </p>
-                  </div>
-                ) : (
-                  <>
-                    <Input
-                      placeholder="Type student ID or name to search..."
-                      value={studentSearch}
-                      onChange={(e) => setStudentSearch(e.target.value)}
-                    />
-                    {studentSearch.length >= 2 && (
-                      <div className="absolute z-50 w-full mt-1 bg-popover border rounded-lg shadow-lg max-h-48 overflow-y-auto">
-                        {studentsLoading ? (
-                          <div className="flex items-center justify-center py-4">
-                            <Loader2 className="h-5 w-5 animate-spin" />
-                          </div>
-                        ) : students && students.length > 0 ? (
-                          students.map((student: any) => (
-                            <button
-                              key={student.id}
-                              type="button"
-                              className="w-full text-left px-3 py-2 hover:bg-accent transition-colors border-b last:border-0"
-                              onClick={() => {
-                                setSelectedStudent(student.id);
-                                setStudentSearch('');
-                              }}
-                            >
-                              <p className="font-medium">{student.full_name}</p>
-                              <p className="text-sm text-muted-foreground">
-                                {student.student_id} • {student.departments?.name}
-                              </p>
-                            </button>
-                          ))
-                        ) : (
-                          <p className="text-sm text-muted-foreground text-center py-4">No students found</p>
-                        )}
+                <Input
+                  placeholder="Type student ID or name to search..."
+                  value={studentSearch}
+                  onChange={(e) => setStudentSearch(e.target.value)}
+                />
+                {studentSearch.length >= 2 && (
+                  <div className="absolute z-50 w-full mt-1 bg-popover border rounded-lg shadow-lg max-h-48 overflow-y-auto">
+                    {studentsLoading ? (
+                      <div className="flex items-center justify-center py-4">
+                        <Loader2 className="h-5 w-5 animate-spin" />
                       </div>
+                    ) : students && students.length > 0 ? (
+                      students.map((student: any) => (
+                        <button
+                          key={student.id}
+                          type="button"
+                          className="w-full text-left px-3 py-2 hover:bg-accent transition-colors border-b last:border-0"
+                          onClick={() => {
+                            setSelectedStudent(student.id);
+                            setStudentSearch('');
+                          }}
+                        >
+                          <p className="font-medium">{student.full_name}</p>
+                          <p className="text-sm text-muted-foreground">
+                            {student.student_id} • {student.departments?.name}
+                          </p>
+                        </button>
+                      ))
+                    ) : (
+                      <p className="text-sm text-muted-foreground text-center py-4">No students found</p>
                     )}
-                    {studentSearch.length > 0 && studentSearch.length < 2 && (
-                      <p className="text-xs text-muted-foreground mt-1">Type at least 2 characters to search</p>
-                    )}
-                  </>
+                  </div>
+                )}
+                {studentSearch.length > 0 && studentSearch.length < 2 && (
+                  <p className="text-xs text-muted-foreground mt-1">Type at least 2 characters to search</p>
                 )}
               </div>
             )}
