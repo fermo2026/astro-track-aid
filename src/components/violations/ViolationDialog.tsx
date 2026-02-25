@@ -51,7 +51,7 @@ interface ViolationDialogProps {
 
 export const ViolationDialog = ({ onSuccess }: ViolationDialogProps) => {
   const { roles, isSystemAdmin } = useAuth();
-  const { activeAcademicPeriod, hasActiveAcademicPeriod, isLoading: academicLoading } = useAcademicSettings();
+  const { allAcademicPeriods, isLoading: academicLoading } = useAcademicSettings();
   const [open, setOpen] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [studentSearch, setStudentSearch] = useState('');
@@ -59,6 +59,7 @@ export const ViolationDialog = ({ onSuccess }: ViolationDialogProps) => {
   const [repeatOffenderInfo, setRepeatOffenderInfo] = useState<RepeatOffenderInfo | null>(null);
   const [isCheckingRepeat, setIsCheckingRepeat] = useState(false);
   const [selectedDepartmentId, setSelectedDepartmentId] = useState<string>('');
+  const [selectedAcademicPeriodId, setSelectedAcademicPeriodId] = useState<string>('');
   const [formData, setFormData] = useState({
     exam_type: '',
     incident_date: '',
@@ -183,9 +184,8 @@ export const ViolationDialog = ({ onSuccess }: ViolationDialogProps) => {
     setIsSubmitting(true);
 
     try {
-      // Validate academic period is required for non-admins
-      if (!activeAcademicPeriod && !isSystemAdmin) {
-        toast.error('No active academic period set');
+      if (!selectedAcademicPeriodId) {
+        toast.error('Please select an academic period');
         return;
       }
 
@@ -209,7 +209,7 @@ export const ViolationDialog = ({ onSuccess }: ViolationDialogProps) => {
         cmc_decision: formData.cmc_decision as any,
         description: formData.description.trim() || null,
         is_repeat_offender: isRepeat,
-        academic_settings_id: activeAcademicPeriod?.id || null,
+        academic_settings_id: selectedAcademicPeriodId || null,
         workflow_status: workflowStatus as any,
         // If AVD is setting decisions, record them as the decision maker
         ...(isAVD && formData.dac_decision !== 'Pending' && {
@@ -247,6 +247,7 @@ export const ViolationDialog = ({ onSuccess }: ViolationDialogProps) => {
     setStudentSearch('');
     setRepeatOffenderInfo(null);
     setSelectedDepartmentId('');
+    setSelectedAcademicPeriodId('');
     setFormData({
       exam_type: '',
       incident_date: '',
@@ -276,29 +277,44 @@ export const ViolationDialog = ({ onSuccess }: ViolationDialogProps) => {
           <DialogDescription>
             Enter the details of the examination violation incident.
           </DialogDescription>
-          {activeAcademicPeriod && (
-            <div className="flex items-center gap-2 mt-2">
-              <Calendar className="h-4 w-4 text-primary" />
-              <Badge variant="outline" className="font-normal">
-                {activeAcademicPeriod.academic_year} - Semester {activeAcademicPeriod.semester}
-              </Badge>
-            </div>
-          )}
         </DialogHeader>
 
-        {/* No Active Academic Period Warning */}
-        {!academicLoading && !hasActiveAcademicPeriod && !isSystemAdmin && (
-          <Alert variant="destructive">
-            <AlertCircle className="h-4 w-4" />
-            <AlertTitle>No Active Academic Period</AlertTitle>
-            <AlertDescription>
-              System administrator has not set an active academic year/semester. 
-              Please contact your system administrator.
-            </AlertDescription>
-          </Alert>
-        )}
-
         <form onSubmit={handleSubmit} className="space-y-6">
+          {/* Academic Period Selection - Required */}
+          <div className="space-y-2">
+            <Label>Academic Period *</Label>
+            {academicLoading ? (
+              <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                <Loader2 className="h-4 w-4 animate-spin" /> Loading academic periods...
+              </div>
+            ) : allAcademicPeriods && allAcademicPeriods.length > 0 ? (
+              <Select
+                value={selectedAcademicPeriodId}
+                onValueChange={setSelectedAcademicPeriodId}
+                required
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Select academic year & semester" />
+                </SelectTrigger>
+                <SelectContent>
+                  {allAcademicPeriods.map((period) => (
+                    <SelectItem key={period.id} value={period.id}>
+                      {period.academic_year} - Semester {period.semester}
+                      {period.is_active ? ' (Active)' : ''}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            ) : (
+              <Alert variant="destructive">
+                <AlertCircle className="h-4 w-4" />
+                <AlertTitle>No Academic Periods</AlertTitle>
+                <AlertDescription>
+                  No academic periods have been configured. Please contact your system administrator.
+                </AlertDescription>
+              </Alert>
+            )}
+          </div>
           {/* AVD info - department auto-detected from student */}
           {isAVD && (
             <Alert>
@@ -569,7 +585,7 @@ export const ViolationDialog = ({ onSuccess }: ViolationDialogProps) => {
             </Button>
             <Button 
               type="submit" 
-              disabled={isSubmitting || !selectedStudent || (!hasActiveAcademicPeriod && !isSystemAdmin)}
+              disabled={isSubmitting || !selectedStudent || !selectedAcademicPeriodId}
             >
               {isSubmitting && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
               Save Record
