@@ -470,6 +470,13 @@ export type Database = {
         | "Plagiarism"
         | "Impersonation"
         | "Other"
+        | "Possession of Unauthorized Materials"
+        | "Allowing Another to Copy"
+        | "Communicating with Other Students"
+        | "Bringing Unauthorized Person"
+        | "Leaving Exam Room Unauthorized"
+        | "Fabrication of Data"
+        | "Tampering with Exam Materials"
       workflow_status:
         | "draft"
         | "submitted_to_head"
@@ -664,6 +671,13 @@ export const Constants = {
         "Plagiarism",
         "Impersonation",
         "Other",
+        "Possession of Unauthorized Materials",
+        "Allowing Another to Copy",
+        "Communicating with Other Students",
+        "Bringing Unauthorized Person",
+        "Leaving Exam Room Unauthorized",
+        "Fabrication of Data",
+        "Tampering with Exam Materials",
       ],
       workflow_status: [
         "draft",
