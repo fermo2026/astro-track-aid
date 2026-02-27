@@ -1,0 +1,1 @@
+ALTER TYPE public.violation_type ADD VALUE IF NOT EXISTS 'Copying from Piece of Paper';

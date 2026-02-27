@@ -478,6 +478,7 @@ export type Database = {
         | "Leaving Exam Room Unauthorized"
         | "Fabrication of Data"
         | "Tampering with Exam Materials"
+        | "Copying from Piece of Paper"
       workflow_status:
         | "draft"
         | "submitted_to_head"
@@ -680,6 +681,7 @@ export const Constants = {
         "Leaving Exam Room Unauthorized",
         "Fabrication of Data",
         "Tampering with Exam Materials",
+        "Copying from Piece of Paper",
       ],
       workflow_status: [
         "draft",

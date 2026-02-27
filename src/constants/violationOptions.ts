@@ -18,6 +18,7 @@ export const violationTypes = [
   'Plagiarism',
   'Fabrication of Data',
   'Tampering with Exam Materials',
+  'Copying from Piece of Paper',
   'Other',
 ] as const;
 
