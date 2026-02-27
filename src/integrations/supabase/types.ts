@@ -449,6 +449,7 @@ export type Database = {
         | "Dismissal"
         | "Referred to University Discipline Committee"
         | "Zero Mark for the Exam"
+        | "F Grade with Academic Suspension (1 Academic Year)"
       exam_type:
         | "Mid Exam"
         | "Final Exam"
@@ -649,6 +650,7 @@ export const Constants = {
         "Dismissal",
         "Referred to University Discipline Committee",
         "Zero Mark for the Exam",
+        "F Grade with Academic Suspension (1 Academic Year)",
       ],
       exam_type: [
         "Mid Exam",
