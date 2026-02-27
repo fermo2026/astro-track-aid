@@ -191,7 +191,7 @@ const Violations = () => {
   const isAVD = roles.some(r => r.role === 'academic_vice_dean');
   const userDepartmentId = roles.find(r => r.department_id)?.department_id;
   
-  const canAddViolation = isAVD || ((isHead || isDeputy) && userDepartmentId);
+  const canAddViolation = isSystemAdmin || isAVD || ((isHead || isDeputy) && userDepartmentId);
   const canSeeCMC = isSystemAdmin || isAVD;
   const queryClient = useQueryClient();
   const [deletingId, setDeletingId] = useState<string | null>(null);
