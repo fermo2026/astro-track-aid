@@ -77,6 +77,9 @@ export const ViolationDialog = ({ onSuccess }: ViolationDialogProps) => {
   const isAVD = roles.some(r => r.role === 'academic_vice_dean');
   const avdCollegeId = roles.find(r => r.role === 'academic_vice_dean')?.college_id;
   
+  // System admin can create violations for all colleges/departments
+  const canSetBothDecisions = isSystemAdmin || isAVD;
+  
   // Get user's department from their role (for non-AVD users)
   const userDepartmentId = roles.find(r => r.department_id)?.department_id;
   
@@ -145,8 +148,8 @@ export const ViolationDialog = ({ onSuccess }: ViolationDialogProps) => {
   });
 
   // Determine which department to filter students by
-  // AVD searches across all college departments (no manual selection needed)
-  const effectiveDepartmentId = isAVD ? null : userDepartmentId;
+  // System admin and AVD search across all/college departments (no manual selection needed)
+  const effectiveDepartmentId = isSystemAdmin ? null : (isAVD ? null : userDepartmentId);
 
   // Fetch students - AVD searches across all college departments, others search their own
   const { data: students, isLoading: studentsLoading } = useQuery({
@@ -159,7 +162,9 @@ export const ViolationDialog = ({ onSuccess }: ViolationDialogProps) => {
         .order('full_name')
         .limit(10);
       
-      if (isAVD && collegeDepartments && collegeDepartments.length > 0) {
+      if (isSystemAdmin) {
+        // System admin: no department filter, can access all students
+      } else if (isAVD && collegeDepartments && collegeDepartments.length > 0) {
         // AVD: filter to students in any department of their college
         query = query.in('department_id', collegeDepartments);
       } else if (effectiveDepartmentId) {
@@ -170,7 +175,7 @@ export const ViolationDialog = ({ onSuccess }: ViolationDialogProps) => {
       if (error) throw error;
       return data;
     },
-    enabled: open && studentSearch.length >= 2 && (isAVD ? (collegeDepartments && collegeDepartments.length > 0) : !!effectiveDepartmentId),
+    enabled: open && studentSearch.length >= 2 && (isSystemAdmin || (isAVD ? (collegeDepartments && collegeDepartments.length > 0) : !!effectiveDepartmentId)),
   });
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -192,8 +197,8 @@ export const ViolationDialog = ({ onSuccess }: ViolationDialogProps) => {
       // Check repeat offender and set flag on violation
       const isRepeat = repeatOffenderInfo?.isRepeatOffender || false;
       
-      // For AVD-created violations, set workflow status to cmc_decided if CMC decision is not Pending
-      const workflowStatus = isAVD && formData.cmc_decision !== 'Pending' 
+      // For AVD/system admin-created violations, set workflow status to cmc_decided if CMC decision is not Pending
+      const workflowStatus = canSetBothDecisions && formData.cmc_decision !== 'Pending' 
         ? 'cmc_decided' 
         : 'draft';
       
@@ -211,11 +216,11 @@ export const ViolationDialog = ({ onSuccess }: ViolationDialogProps) => {
         is_repeat_offender: isRepeat,
         academic_settings_id: selectedAcademicPeriodId || null,
         workflow_status: workflowStatus as any,
-        // If AVD is setting decisions, record them as the decision maker
-        ...(isAVD && formData.dac_decision !== 'Pending' && {
+        // If AVD/system admin is setting decisions, record them as the decision maker
+        ...(canSetBothDecisions && formData.dac_decision !== 'Pending' && {
           dac_decision_date: new Date().toISOString().split('T')[0],
         }),
-        ...(isAVD && formData.cmc_decision !== 'Pending' && {
+        ...(canSetBothDecisions && formData.cmc_decision !== 'Pending' && {
           cmc_decision_date: new Date().toISOString().split('T')[0],
         }),
       };
@@ -315,11 +320,13 @@ export const ViolationDialog = ({ onSuccess }: ViolationDialogProps) => {
               </Alert>
             )}
           </div>
-          {/* AVD info - department auto-detected from student */}
-          {isAVD && (
+          {/* AVD/System Admin info - department auto-detected from student */}
+          {canSetBothDecisions && (
             <Alert>
               <AlertDescription className="text-sm">
-                Department will be automatically assigned based on the selected student's information.
+                {isSystemAdmin 
+                  ? 'You can create violations for all colleges and departments. Department will be automatically assigned based on the selected student.'
+                  : 'Department will be automatically assigned based on the selected student\'s information.'}
               </AlertDescription>
             </Alert>
           )}
@@ -493,7 +500,7 @@ export const ViolationDialog = ({ onSuccess }: ViolationDialogProps) => {
           {/* DAC Decision */}
           <div className="space-y-2">
             <Label className="flex items-center gap-2">
-              DAC Decision {isAVD ? '' : '(Initial)'}
+              DAC Decision {canSetBothDecisions ? '' : '(Initial)'}
               {repeatOffenderInfo?.isRepeatOffender && (
                 <Badge variant="outline" className="text-[10px] font-normal">
                   <Star className="h-3 w-3 mr-1 fill-warning text-warning" />
@@ -521,7 +528,7 @@ export const ViolationDialog = ({ onSuccess }: ViolationDialogProps) => {
                 ))}
               </SelectContent>
             </Select>
-            {!isAVD && (
+            {!canSetBothDecisions && (
               <p className="text-xs text-muted-foreground">
                 {repeatOffenderInfo?.isRepeatOffender 
                   ? '⚠️ Escalated penalty suggested based on ASTU legislation. CMC decision will be set after approval workflow.'
@@ -530,8 +537,8 @@ export const ViolationDialog = ({ onSuccess }: ViolationDialogProps) => {
             )}
           </div>
 
-          {/* CMC Decision - Only for AVD */}
-          {isAVD && (
+          {/* CMC Decision - Only for AVD and System Admin */}
+          {canSetBothDecisions && (
             <div className="space-y-2">
               <Label className="flex items-center gap-2">
                 CMC Decision
@@ -563,7 +570,9 @@ export const ViolationDialog = ({ onSuccess }: ViolationDialogProps) => {
                 </SelectContent>
               </Select>
               <p className="text-xs text-muted-foreground">
-                As AVD, you can set both DAC and CMC decisions simultaneously.
+                {isSystemAdmin 
+                  ? 'As System Admin, you can set both DAC and CMC decisions simultaneously for all colleges.'
+                  : 'As AVD, you can set both DAC and CMC decisions simultaneously.'}
               </p>
             </div>
           )}
