@@ -32,6 +32,7 @@ export const dacDecisionOptions = [
   'Zero Mark for the Exam',
   'F Grade for Course',
   'F Grade with Academic Probation',
+  'F Grade with Academic Suspension (1 Academic Year)',
   'Referred to CMC',
   'Cleared',
 ] as const;
@@ -48,6 +49,7 @@ export const cmcDecisionOptions = [
   'Suspension (1 Semester)',
   'Suspension (2 Semesters)',
   'Suspension (1 Academic Year)',
+  'F Grade with Academic Suspension (1 Academic Year)',
   'Dismissal',
   'Referred to University Discipline Committee',
   'Cleared',
