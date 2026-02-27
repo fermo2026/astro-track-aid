@@ -1,0 +1,1 @@
+ALTER TYPE public.decision_status ADD VALUE IF NOT EXISTS 'Zero Mark for the Exam';
