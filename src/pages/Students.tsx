@@ -66,7 +66,7 @@ const Students = () => {
     staleTime: 5 * 60 * 1000, // Cache for 5 minutes
   });
 
-  const { data: studentsData, isLoading } = useQuery({
+  const { data: studentsData, isLoading, isError, error } = useQuery({
     queryKey: ['students', departmentFilter, programFilter, searchQuery],
     queryFn: async () => {
       let query = supabase
@@ -91,10 +91,14 @@ const Students = () => {
       }
 
       const { data, error } = await query;
-      if (error) throw error;
+      if (error) {
+        console.error('Students query error:', error);
+        throw error;
+      }
       return data;
     },
-    staleTime: 3 * 60 * 1000, // Cache for 3 minutes
+    staleTime: 3 * 60 * 1000,
+    retry: 1,
   });
 
   // Filter by search query
@@ -201,6 +205,14 @@ const Students = () => {
           <CardContent className="p-0">
             {isLoading ? (
               <TableSkeleton columns={5} rows={8} columnWidths={['w-20', 'w-32', 'w-16', 'w-12', 'w-12']} />
+            ) : isError ? (
+              <div className="text-center py-20">
+                <AlertTriangle className="h-16 w-16 mx-auto text-destructive/50 mb-4" />
+                <h3 className="text-xl font-semibold text-destructive">Failed to load students</h3>
+                <p className="text-muted-foreground mt-2">
+                  {error instanceof Error ? error.message : 'An unexpected error occurred. Please try refreshing the page.'}
+                </p>
+              </div>
             ) : paginatedStudents.length > 0 ? (
               <>
                 <Table>
