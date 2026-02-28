@@ -13,20 +13,28 @@ import {
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
+import { useAuth } from '@/contexts/AuthContext';
 
+// ✅ Navigation items with role control
 const navItems = [
-  { icon: LayoutDashboard, label: 'Dashboard', path: '/' },
-  { icon: FileText, label: 'Violations', path: '/violations' },
-  { icon: Users, label: 'Students', path: '/students' },
-  { icon: BarChart3, label: 'Reports', path: '/reports' },
-  { icon: Building2, label: 'Organization', path: '/departments' },
-  { icon: Shield, label: 'User Management', path: '/users' },
-  { icon: Settings, label: 'Settings', path: '/settings' },
+  { icon: LayoutDashboard, label: 'Dashboard', path: '/', roles: ['all'] },
+  { icon: FileText, label: 'Violations', path: '/violations', roles: ['all'] },
+  { icon: Users, label: 'Students', path: '/students', roles: ['all'] },
+  { icon: BarChart3, label: 'Reports', path: '/reports', roles: ['all'] },
+  { icon: Building2, label: 'Organization', path: '/departments', roles: ['all'] },
+  { icon: Shield, label: 'User Management', path: '/users', roles: ['system_admin'] },
+  { icon: Settings, label: 'Settings', path: '/settings', roles: ['system_admin'] },
 ];
 
 export const Sidebar = () => {
   const [collapsed, setCollapsed] = useState(false);
   const location = useLocation();
+  const { roles } = useAuth();
+
+  const userRoles = roles.map(r => r.role);
+  const filteredNavItems = navItems.filter(item =>
+    item.roles.includes('all') || item.roles.some(role => userRoles.includes(role))
+  );
 
   return (
     <aside
@@ -49,7 +57,7 @@ export const Sidebar = () => {
       </Button>
 
       <nav className="flex-1 p-3 space-y-1">
-        {navItems.map((item) => {
+        {filteredNavItems.map((item) => {
           const isActive = location.pathname === item.path;
           return (
             <NavLink
