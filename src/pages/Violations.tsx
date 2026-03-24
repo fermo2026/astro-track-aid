@@ -226,7 +226,7 @@ const Violations = () => {
     staleTime: 5 * 60 * 1000, // Cache for 5 minutes
   });
 
-  const { data: violations, isLoading } = useQuery({
+  const { data: violations, isLoading, isError, error } = useQuery({
     queryKey: ['violations', departmentFilter, statusFilter],
     queryFn: async () => {
       let query = supabase
@@ -262,6 +262,8 @@ const Violations = () => {
       return data;
     },
     staleTime: 2 * 60 * 1000, // Cache for 2 minutes
+    retry: 1,
+    placeholderData: (previousData) => previousData,
   });
 
   const filteredViolations = violations?.filter((v: any) => {
@@ -347,6 +349,14 @@ const Violations = () => {
           <CardContent className="p-0">
             {isLoading ? (
               <TableSkeleton columns={7} rows={8} columnWidths={['w-32', 'w-12', 'w-28', 'w-16', 'w-20', 'w-20', 'w-16']} />
+            ) : isError ? (
+              <div className="text-center py-20">
+                <AlertTriangle className="h-16 w-16 mx-auto text-destructive/50 mb-4" />
+                <h3 className="text-xl font-semibold text-destructive">Failed to load violations</h3>
+                <p className="text-muted-foreground mt-2">
+                  {error instanceof Error ? error.message : 'An unexpected error occurred. Please try refreshing the page.'}
+                </p>
+              </div>
             ) : filteredViolations && filteredViolations.length > 0 ? (
               <div className="overflow-x-auto">
                 <Table>
