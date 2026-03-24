@@ -1,5 +1,5 @@
-import { useState, useEffect } from 'react';
-import { useQueryClient } from '@tanstack/react-query';
+import { useState } from 'react';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -34,25 +34,11 @@ export const QuickApprovalActions = ({ violation }: QuickApprovalActionsProps) =
   const { user, roles, isSystemAdmin } = useAuth();
   const queryClient = useQueryClient();
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [repeatInfo, setRepeatInfo] = useState<RepeatOffenderInfo | null>(null);
+  const [shouldLoadRepeatInfo, setShouldLoadRepeatInfo] = useState(false);
 
   const isDeputy = roles.some(r => r.role === 'deputy_department_head');
   const isHead = roles.some(r => r.role === 'department_head');
   const isAVD = roles.some(r => r.role === 'academic_vice_dean');
-
-  // Load repeat offender info for suggesting penalties
-  useEffect(() => {
-    const loadRepeatInfo = async () => {
-      if (!violation.students?.id) return;
-      try {
-        const info = await checkRepeatOffender(violation.students.id);
-        setRepeatInfo(info);
-      } catch (error) {
-        console.error('Error loading repeat info:', error);
-      }
-    };
-    loadRepeatInfo();
-  }, [violation.students?.id]);
 
   // Determine what action is available based on workflow status
   const status = violation.workflow_status;
@@ -68,6 +54,19 @@ export const QuickApprovalActions = ({ violation }: QuickApprovalActionsProps) =
      status === 'submitted_to_avd' || status === 'approved_by_head' ||
      // AVD can also set CMC once they've set DAC decision
      (violation.dac_decision !== 'Pending' && status !== 'cmc_decided' && status !== 'closed'));
+
+  const needsRepeatInfo = canApproveAsHead || canSetDACDecision || canSetCMCDecision || canApproveAsAVD;
+
+  const { data: repeatInfo } = useQuery<RepeatOffenderInfo>({
+    queryKey: ['repeat-offender-info', violation.students?.id],
+    queryFn: async () => checkRepeatOffender(violation.students.id),
+    enabled: shouldLoadRepeatInfo && needsRepeatInfo && Boolean(violation.students?.id),
+    staleTime: 5 * 60 * 1000,
+  });
+
+  const loadRepeatInfoOnOpen = (open: boolean) => {
+    if (open) setShouldLoadRepeatInfo(true);
+  };
   
   // No action available
   const noAction = !canSubmitToHead && !canApproveAsHead && !canSubmitToAVD && !canApproveAsAVD && !canSetDACDecision && !canSetCMCDecision;
@@ -202,7 +201,7 @@ export const QuickApprovalActions = ({ violation }: QuickApprovalActionsProps) =
     const isRepeat = repeatInfo?.isRepeatOffender || violation.is_repeat_offender;
     
     return (
-      <DropdownMenu>
+      <DropdownMenu onOpenChange={loadRepeatInfoOnOpen}>
         <DropdownMenuTrigger asChild>
           <Button size="sm" className={`h-7 text-xs ${isRepeat ? 'bg-destructive hover:bg-destructive/90' : 'bg-primary'}`}>
             {isRepeat && <AlertTriangle className="h-3 w-3 mr-1" />}
@@ -278,7 +277,7 @@ export const QuickApprovalActions = ({ violation }: QuickApprovalActionsProps) =
     const isRepeat = repeatInfo?.isRepeatOffender || violation.is_repeat_offender;
     
     return (
-      <DropdownMenu>
+      <DropdownMenu onOpenChange={loadRepeatInfoOnOpen}>
         <DropdownMenuTrigger asChild>
           <Button size="sm" className={`h-7 text-xs ${isRepeat ? 'bg-destructive hover:bg-destructive/90' : 'bg-primary'}`}>
             {isRepeat && <AlertTriangle className="h-3 w-3 mr-1" />}
@@ -339,7 +338,7 @@ export const QuickApprovalActions = ({ violation }: QuickApprovalActionsProps) =
     return (
       <div className="flex gap-1">
         {canSetDACDecision && (
-          <DropdownMenu>
+          <DropdownMenu onOpenChange={loadRepeatInfoOnOpen}>
             <DropdownMenuTrigger asChild>
               <Button size="sm" variant="outline" className="h-7 text-xs">
                 <Gavel className="h-3 w-3 mr-1" />
@@ -368,7 +367,7 @@ export const QuickApprovalActions = ({ violation }: QuickApprovalActionsProps) =
             </DropdownMenuContent>
           </DropdownMenu>
         )}
-        <DropdownMenu>
+        <DropdownMenu onOpenChange={loadRepeatInfoOnOpen}>
           <DropdownMenuTrigger asChild>
             <Button size="sm" className={`h-7 text-xs ${isRepeat ? 'bg-destructive hover:bg-destructive/90' : 'bg-primary'}`}>
               {isRepeat && <AlertTriangle className="h-3 w-3 mr-1" />}
