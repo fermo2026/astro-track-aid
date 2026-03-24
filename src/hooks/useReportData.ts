@@ -108,6 +108,9 @@ export const useReportData = (filters: ReportFilters) => {
 
       return filteredData;
     },
+    staleTime: 2 * 60 * 1000,
+    retry: 1,
+    placeholderData: (previousData) => previousData,
   });
 };
 

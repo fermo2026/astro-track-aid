@@ -10,7 +10,7 @@ import { ReportCharts } from '@/components/reports/ReportCharts';
 import { ExportButton } from '@/components/export/ExportButton';
 import { useReportData, useReportSummary, ReportFilters as ReportFiltersType } from '@/hooks/useReportData';
 import { supabase } from '@/integrations/supabase/client';
-import { FileText, BarChart3, Table } from 'lucide-react';
+import { BarChart3, Table, AlertTriangle } from 'lucide-react';
 import { TableSkeleton } from '@/components/ui/table-skeleton';
 import { format } from 'date-fns';
 
@@ -41,7 +41,7 @@ const Reports = () => {
     },
   });
 
-  const { data: reportData, isLoading } = useReportData(filters);
+  const { data: reportData, isLoading, isError, error } = useReportData(filters);
   const summary = useReportSummary(reportData);
 
   const handleReset = () => {
@@ -133,6 +133,14 @@ const Reports = () => {
           {isLoading ? (
             <div className="mt-6">
               <TableSkeleton columns={10} rows={6} columnWidths={['w-28', 'w-20', 'w-16', 'w-20', 'w-24', 'w-16', 'w-20', 'w-20', 'w-20', 'w-16']} />
+            </div>
+          ) : isError ? (
+            <div className="mt-6 text-center py-12 border rounded-lg">
+              <AlertTriangle className="h-12 w-12 mx-auto text-destructive/50 mb-3" />
+              <h3 className="text-lg font-semibold text-destructive">Failed to load report data</h3>
+              <p className="text-muted-foreground mt-2">
+                {error instanceof Error ? error.message : 'An unexpected error occurred. Please try refreshing the page.'}
+              </p>
             </div>
           ) : (
             <>
