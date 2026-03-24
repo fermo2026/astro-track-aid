@@ -67,7 +67,7 @@ const Students = () => {
   });
 
   const { data: studentsData, isLoading, isError, error } = useQuery({
-    queryKey: ['students', departmentFilter, programFilter, searchQuery],
+    queryKey: ['students', departmentFilter, programFilter],
     queryFn: async () => {
       let query = supabase
         .from('students')
@@ -77,8 +77,7 @@ const Students = () => {
           full_name,
           program,
           department_id,
-          departments(name, code),
-          violations(id)
+          departments(name, code)
         `)
         .order('full_name');
 
@@ -95,10 +94,32 @@ const Students = () => {
         console.error('Students query error:', error);
         throw error;
       }
-      return data;
+
+      const { data: violationRows, error: violationError } = await supabase
+        .from('violations')
+        .select('student_id');
+
+      if (violationError) {
+        console.error('Violation count query error:', violationError);
+        throw violationError;
+      }
+
+      const violationCountByStudent = (violationRows || []).reduce<Record<string, number>>(
+        (acc, row) => {
+          acc[row.student_id] = (acc[row.student_id] || 0) + 1;
+          return acc;
+        },
+        {}
+      );
+
+      return (data || []).map((student) => ({
+        ...student,
+        violation_count: violationCountByStudent[student.id] || 0,
+      }));
     },
     staleTime: 3 * 60 * 1000,
     retry: 1,
+    placeholderData: (previousData) => previousData,
   });
 
   // Filter by search query
@@ -250,11 +271,11 @@ const Students = () => {
                             studentName={student.full_name}
                             studentIdNumber={student.student_id}
                             trigger={
-                              student.violations?.length > 0 ? (
+                              student.violation_count > 0 ? (
                                 <button className="cursor-pointer">
                                   <Badge variant="destructive" className="flex items-center gap-1 w-fit hover:bg-destructive/80 transition-colors">
                                     <AlertTriangle className="h-3 w-3" />
-                                    {student.violations.length}
+                                    {student.violation_count}
                                   </Badge>
                                 </button>
                               ) : (
